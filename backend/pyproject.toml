@@ -16,6 +16,7 @@ include = ["app*"]
 
 [tool.setuptools.package-data]
 "app.services.assurance" = ["migrations/*.sql"]
+"app.services.simulation" = ["fixtures/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

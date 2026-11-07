@@ -38,3 +38,26 @@ export async function loadWorkspace(client: ApiClient, ids: Identifiers, signal?
   const audit = repair ? (await listAll(client, `/cases/${caseId}/audit`, decodeAudit, signal)).map(v => belongs(v, caseId)) : [];
   return { caseResource, documents, job, findings, challenge, simulation, repair, reviews, audit };
 }
+
+// Recover downstream identifiers from authorized server lists when a case is
+// reopened from history, rather than relying on a prior tab's saved IDs.
+export async function restoreCaseResources(client: ApiClient, ids: Identifiers, signal?: AbortSignal): Promise<{ ids: Identifiers; resources: Resources }> {
+  const base = await loadWorkspace(client, ids, signal);
+  const finding = base.findings[0];
+  if (!ids.case_id || !finding) return { ids, resources: base };
+  const caseId = ids.case_id;
+  const newest = <T extends { created_at: string }>(items: T[]): T | undefined => [...items].sort((a,b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+  const [challenges, simulations, repairs] = await Promise.all([
+    listAll(client, `/cases/${caseId}/challenges`, decodeChallenge, signal),
+    listAll(client, `/cases/${caseId}/simulations`, decodeSimulation, signal),
+    listAll(client, `/findings/${finding.finding_id}/repair-proposals`, decodeRepair, signal),
+  ]);
+  for (const item of [...challenges, ...simulations, ...repairs]) belongs(item, caseId);
+  if (repairs.some(item => item.finding_id !== finding.finding_id)) throw new ShapeError("Repair history refers to a different finding.");
+  const repair = newest(repairs);
+  const simulation = repair ? simulations.find(item => item.simulation_id === repair.simulation_id) : newest(simulations.filter(item => item.finding_id === finding.finding_id));
+  const challenge = newest(challenges.filter(item => item.finding_id === finding.finding_id));
+  const recovered = { ...ids, selected_finding_id: finding.finding_id, challenge_id: challenge?.challenge_id ?? null,
+    simulation_id: repair?.simulation_id ?? simulation?.simulation_id ?? null, repair_proposal_id: repair?.repair_proposal_id ?? null };
+  return { ids: recovered, resources: await loadWorkspace(client, recovered, signal) };
+}

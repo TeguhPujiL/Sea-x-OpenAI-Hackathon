@@ -10,6 +10,7 @@ from app.core.integration import AuditCommand
 from app.core.security import get_actor
 from app.core.transactions import case_for, resource_for
 from app.main import create_app
+from app.core.login import LoginSettings, install_login
 from app.models import CaseAccess, Finding
 from app.services.assurance.access import get_case_grants
 from app.services.assurance.audit import append_audit
@@ -22,7 +23,7 @@ class AssuranceAuditAdapter:
             resource_version=command.version,details=json.loads(command.details_json))
 
 
-def create_web_app(settings=None, static_directory=None):
+def create_web_app(settings=None, static_directory=None, login_settings=None):
     config=settings or get_settings()
     app=create_app(config,audit_service=AssuranceAuditAdapter())
 
@@ -49,6 +50,8 @@ def create_web_app(settings=None, static_directory=None):
     async def simulation_policy(request,call_next):
         request.state.simulation_access=DemoSimulationPolicy()
         return await call_next(request)
+
+    install_login(app, login_settings or LoginSettings())
 
     directory=Path(static_directory) if static_directory else ROOT/'frontend'/'dist'
     if not directory.joinpath('index.html').is_file():

@@ -11,7 +11,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://127.0.0.1:18742");
     if (url.pathname === "/__test/state") { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ ...backend.state, idempotency: undefined })); return; }
     if (url.pathname === "/__test/mode" && req.method === "POST") { let body = ""; for await (const chunk of req) body += chunk; Object.assign(backend.state, JSON.parse(body)); res.end("ok"); return; }
-    if (url.pathname.startsWith("/api/v1/")) {
+    if (url.pathname.startsWith("/api/v1/") || url.pathname.startsWith("/auth/")) {
       const chunks = []; for await (const chunk of req) chunks.push(chunk);
       const bytes = Buffer.concat(chunks); const type = req.headers["content-type"] ?? "";
       const body = type.startsWith("multipart/") ? await new Response(bytes, { headers: { "Content-Type": type } }).formData() : bytes.length ? bytes.toString() : undefined;

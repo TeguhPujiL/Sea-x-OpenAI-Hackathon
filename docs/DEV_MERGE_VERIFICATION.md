@@ -1,3 +1,30 @@
+# Aris into dev: 7 November 2026
+
+Merged aris 185a8ab into dev c3738d7, preserving both histories. Includes local
+login, persistent Docker testing, case history/category/pagination/delete,
+multi-document uploads, footer document-type saves and provider schema fixes.
+
+Conflict resolution keeps dev's audit-gap/provenance labels and diagnostics,
+aris's workflow controls, and regression tests from both branches. The two
+provider schema adapters share dev's canonical schema module with aris's UUID v4
+pattern; the aris import path remains a compatibility re-export. Public shared
+schemas, immutable records, authorization and simulation calculations are unchanged.
+
+Executed on the merged tree:
+
+- Full backend pytest: 304 passed (dependency deprecation warnings only).
+- Frontend Node tests: 53 passed.
+- TypeScript typecheck and Vite production build: passed.
+- git diff --check: passed.
+
+No live provider call or Docker redeployment was performed for this merge.
+Earlier aris live synthetic/Docker checks are recorded separately in LOCAL_DOCKER.md.
+Credentials and local .env are excluded. G01 clean-case completion remains open.
+
+The sections below retain historical verification from earlier integrations.
+
+---
+
 # Current dev merge: Teguh 22569a3 into dev 2e38296
 
 All 36 business operations plus health register. Current schema: openapi.dev.json. Frontend and teammate Simulation/Review/Audit modules are preserved; dev model default gpt-6.1-sol remains. The merge composes all routers and preserves owner-defined 422 errors while replacing only FastAPI default validation schemas.

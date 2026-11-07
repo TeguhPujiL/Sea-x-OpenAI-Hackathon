@@ -252,3 +252,69 @@ test("failed job with no provider response decodes and displays the authoritativ
   const { model, ...missingModel } = job.ai_execution;
   assert.throws(() => decodeJob({ ...job, ai_execution: missingModel }), ShapeError);
 });
+
+test("audit refresh accepts null hashes returned by the backend after clean analysis", async () => {
+  const event = { ...auditResource(), event_type: "ANALYSIS_COMPLETED", resource: { type: "job", id: IDs.job, version: 1 }, details: { finding_count: 0 }, event_hash: null, previous_hash: null };
+  const client = createClient(config, async () => Response.json(envelope(page([event]))));
+  const events = await listAll(client, `/cases/${IDs.case}/audit`, decodeAudit);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].event_hash, null);
+  const resources = { ...emptyResources(), caseResource: caseResource(), job: jobResource("COMPLETED", true), audit: events };
+  const html = view({ resources, step: 5 });
+  assert.match(html, /Clean-case completion pending contract decision/);
+  assert.match(html, /analysis completed/i);
+  assert.match(html, /hash chain not implemented/);
+  assert.doesNotMatch(html, /Unable to continue/);
+});
+test("audit accepts unknown legacy actor names without weakening reviewer validation", () => {
+  const event = { ...auditResource(), actor: { actor_id: IDs.actor, display_name: null, role: null }, event_hash: null };
+  assert.equal(decodeAudit(event).actor.actor_id, IDs.actor);
+  const resources = { ...fullResources(), audit: [event] };
+  assert.match(view({ resources, step: 5 }), /Actor name unavailable/);
+  assert.throws(() => decodeReview({ ...reviewResource(), reviewer: event.actor }), ShapeError);
+});
+test("audit rejects invalid hash values and missing fields", () => {
+  for (const field of ["event_hash", "previous_hash"]) {
+    for (const value of [42, true, {}, [], undefined]) {
+      assert.throws(() => decodeAudit({ ...auditResource(), [field]: value }), ShapeError);
+    }
+  }
+  assert.equal(decodeAudit({ ...auditResource(), event_hash: "test-only-event-hash" }).event_hash, "test-only-event-hash");
+});
+
+
+test("uploaded documents expose removal while active analysis disables it", () => {
+  const resources = fullResources();
+  const html = view({ resources, ids: fullIds(), step: 0 });
+  assert.match(html, /Remove document/);
+  assert.match(html, /aria-label="Remove test-tor.pdf"/);
+  resources.job = jobResource("PROCESSING");
+  const busy = view({ resources, ids: fullIds(), step: 0 });
+  assert.match(busy, /disabled=""[^>]*aria-label="Remove test-tor.pdf"/);
+});
+
+
+test("failed analysis with no provider response retains null model and original error", () => {
+  const job = { ...jobResource("FAILED"), error: { code: "AI_PROVIDER_ERROR", message: "AI provider is unavailable", retryable: false },
+    ai_execution: { ...jobResource().ai_execution, model: null, usage: null, schema_valid: false,
+      evidence_validation_passed: false, evidence_checks: { checked: 0, passed: 0, failed: 0 } } };
+  assert.equal(decodeJob(job).ai_execution.model, null);
+  const html = view({ resources: { ...emptyResources(), job }, step: 1 });
+  assert.match(html, /AI_PROVIDER_ERROR/);
+  assert.match(html, /Not reported \(no provider response\)/);
+  assert.doesNotMatch(html, /Unable to continue/);
+  for (const model of [42, true, {}, [], undefined]) {
+    assert.throws(() => decodeJob({ ...job, ai_execution: { ...job.ai_execution, model } }), ShapeError);
+  }
+  assert.equal(decodeJob(jobResource()).ai_execution.model, "synthetic-test-model");
+});
+
+
+test("document types save together at the footer and unsaved choices block Assess", () => {
+  const docs = [documentResource(), documentResource("TECHNICAL_SPECIFICATION")];
+  const base = { resources: { ...emptyResources(), caseResource: caseResource(), documents: docs }, ids: { ...emptyIds(), case_id: IDs.case } };
+  const html = view({ ...base, documentTypeDrafts: { [IDs.tor]: "OTHER" } });
+  assert.equal((html.match(/>Save document types<\/button>/g) ?? []).length, 1);
+  assert.match(html, /Save document types<\/button><button[^>]*disabled=""[^>]*>Continue to Assess/);
+  assert.match(view(base), /disabled=""[^>]*>Save document types/);
+});

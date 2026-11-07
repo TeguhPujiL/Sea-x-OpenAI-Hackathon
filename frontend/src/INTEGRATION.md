@@ -66,3 +66,105 @@ Semantic forms and labels, fieldsets, native keyboard controls, current-step sem
 The unresolved README merge pre-existed this work. No branch merge, staging, commit, push, schema change, route implementation or deployment is performed by this frontend task. Real upload/AI, authorization, immutable persistence, review/audit atomicity, and restart persistence require the integrated backend and owner verification.
 
 Browser QA was attempted with a visibly labelled local fixture server. The browser-control tool stopped because it could not confidently determine the active URL on Windows. Visual layout, responsive rendering, interactive keyboard traversal and browser-console verification are therefore not certified; automated markup/logic checks and TypeScript/build results are reported separately.
+
+
+## Audit refresh compatibility fix
+
+After updating to dev commit 3bcec7b, the backend AuditView permits explicit
+null event_hash/previous_hash values because hash chaining is optional. Its
+legacy audit actor projection also permits null display_name and role rather
+than inventing historical identity. The frontend now accepts those nulls while
+requiring the fields, UUID actor ID and valid non-null types. Review identities
+remain strict. Missing audit hashes/names are labelled as not recorded.
+
+The old event_hash string-only decoder raised the screenshot's exact
+`audit.event_hash does not match API Contract v1.1.` error while reading the
+audit timeline; it did not mean that the completed AI analysis had failed.
+Regression coverage includes null hashes after clean analysis, legacy actor
+metadata, retained hashed records, malformed fields and clean-case rendering.
+
+The separate clean-case completion notice remains intentional under G01:
+no findings means no fabricated repair proposal, and v1.1 has no APPROVE_CASE.
+This fix does not introduce a new review decision or mutate audit history.
+
+
+## Local login, case history and multi-file evidence upload
+
+The combined `app.web:create_web_app` now provides operational `/auth/session`,
+`/auth/login`, and `/auth/logout` endpoints outside the frozen `/api/v1` business
+contract. Configure the single local username and password in the ignored root
+`.env` via `PROCUREMIND_LOGIN_USERNAME` and `PROCUREMIND_LOGIN_PASSWORD`.
+Login is enabled by default for the combined web app and refuses to start without
+credentials. `PROCUREMIND_LOGIN_ENABLED=false` is an explicit isolated-test option,
+not the local application's default. The API-only `app.main` composition remains
+a developer/test entry point; do not expose it alongside the protected web server.
+
+Sessions are server-side, opaque, HttpOnly, SameSite=Strict, expire after eight
+hours, and are revoked on sign-out. Token hashes, not raw cookies, are stored in
+memory. Server restart signs users out. Login attempts are rate-limited and
+cross-origin mutations rejected. HTTPS cookies are Secure; the local HTTP preview
+uses localhost. Credentials are not embedded in frontend bundles or browser
+storage. This is a single-account local login protecting the configured demo
+actor, scopes and case membership; it does not implement production OIDC or
+multi-user account administration. These operational endpoints require integration
+owner review before deployment; no business response/schema/enum was changed.
+
+Case history uses the existing authorized GET /cases endpoint, with search, category filtering, five-case pagination and a
+reopen action. Reopening loads documents, the latest analysis, findings and any
+available audit history from the server. Recent browsing history stores at most 50 UUIDs
+in localStorage, with no case titles, document content, cached results or reviewer
+identity. Active-workspace recovery continues to store only resource identifiers
+in sessionStorage. History can be filtered to recently opened cases; all currently
+authorized cases remain available, including after browser-storage loss.
+
+Select multiple PDFs in Upload. Each file is sent as an independent contracted
+multipart request with its own Idempotency-Key. New documents start as OTHER;
+choose the correct document type on each uploaded row and save it. Metadata PATCH
+sends document_type and expected_version and retains the PDF bytes. TOR and
+TECHNICAL_SPECIFICATION enable the comparison prerequisite after successful saves.
+A stale version is refreshed/reconciled, not silently overwritten.
+
+Batch progress reports each file separately. Successful files remain uploaded if
+another fails. Retry skips successes; unknown transport outcomes retain their
+original request/key. Invalid or cross-case response shapes require refresh and
+reconciliation before a new upload for that file. Clearing the upload list never
+deletes a server document. New uploads/type edits reset only local downstream
+selection, preserving all immutable server executions and review records.
+
+Tests cover authenticated API access, failed/expired/tampered sessions, logout,
+CSRF, rate limiting, authorized history, persisted document-type changes, recent-ID
+storage, batch partial failure, transport retry keys, UI controls and credential
+masking. Visual browser verification was unavailable because the local-origin
+browser permission was declined; automated API, rendered markup and build checks
+are reported separately.
+
+
+## Assess and history follow-up
+
+AI execution model is nullable, matching the backend ExecutionView. Failed provider
+calls with no returned model/usage now show their real error instead of a client
+shape error; malformed non-null values still fail validation. The model name is
+never fabricated from the configured requested model.
+
+History defaults to newest created_at first and five cases per page, with category,
+text and recently-opened filters. Filter changes reset the page. Pagination clamps
+when fewer results remain. Category options come from authorized backend cases;
+filtering/pagination are client-side over the existing paginated GET /cases data,
+without adding unsupported API query fields or caching case content locally.
+
+
+## Document type footer and case removal
+
+Document type controls edit local selections. A single **Save document types**
+button sits at the bottom next to **Continue to Assess**, sending existing
+PATCH /documents/{id} requests sequentially with each document's current version.
+Unchanged rows are skipped. Successful responses are applied immediately; a
+later failure stops the batch and retains the other choices. Version conflicts
+refresh authoritative resources before the user explicitly saves again. Continue
+and analysis are blocked until all pending selections are saved.
+
+History rows offer **Delete case** with confirmation and a reason, using the
+existing DELETE /cases/{id} request (reason, expected_version). Success removes
+that case from the visible history and local recent IDs, and clears the workspace
+if it was active. No new backend route or shared schema is introduced. Server
+scope/access checks, active-analysis/review protections and soft deletion apply.

@@ -61,13 +61,11 @@ export interface RepairResource {
   simulation_id: string; ai_execution_id: string; human_edits: boolean; version: number; created_at: string; updated_at: string;
 }
 export interface Actor { actor_id: string; display_name: string; role: string }
-// Older audit rows may lack a historical name/role snapshot. Their backend
-// actor UUID is still required; review identity retains the stricter Actor type.
-export interface AuditActor { actor_id: string; display_name: string | null; role: string | null }
 export interface ReviewResource {
   review_id: string; case_id: string; repair_proposal_id: string; decision: ReviewDecision; decision_reason: string;
   review_status: "COMPLETED"; reviewer: Actor; assurance_status_after: CaseResource["assurance_status"]; created_at: string;
 }
+export interface AuditActor { actor_id: string; display_name: string | null; role: string | null }
 export interface AuditResource {
   event_id: string; case_id: string; event_type: string; actor: AuditActor; resource: { type: string; id: string; version: number };
   occurred_at: string; request_id: string; details: Record<string, unknown>; previous_hash: string | null; event_hash: string | null;
@@ -99,6 +97,7 @@ const statuses = ["QUEUED", "PROCESSING", "COMPLETED", "FAILED", "NEEDS_REVIEW"]
 const evidenceStatuses = ["VERIFIED", "UNVERIFIED", "CONFLICTING", "INSUFFICIENT"];
 const assurance = oneOf(["ACTION_REQUIRED", "READY_FOR_REVIEW", "REVIEW_COMPLETED"]);
 const actor = recordCheck({ actor_id: uuid, display_name: text, role: text });
+// Historical audit snapshots may omit names/roles; review identities remain strict.
 const auditActor = recordCheck({ actor_id: uuid, display_name: nullable(text), role: nullable(text) });
 const metric = (signed: boolean): Check => recordCheck({ eligible_supplier_count: v => Number.isSafeInteger(v) && (signed || (v as number) >= 0), lowest_total_offer_idr: v => Number.isSafeInteger(v) && (signed || (v as number) >= 0) });
 function decode<T>(name: string, checks: Record<string, Check>, extra?: (v: Record<string, unknown>) => boolean): Decoder<T> {
@@ -134,3 +133,7 @@ export function decodeEnvelope<T>(value: unknown, dataDecoder: Decoder<T>): ApiE
   if (v.data !== null || !recordCheck({ code: text, message: text, details: array(recordCheck({ field: text, reason: text })), retryable: bool })(v.error)) throw new ShapeError("Invalid canonical API error.");
   return value as ApiEnvelope<T>;
 }
+
+export const decodeDocumentDeleted = decode<{ document_id: string; deleted_at: string }>("deleted_document", { document_id: uuid, deleted_at: utc });
+
+export const decodeCaseDeleted = decode<{ case_id: string; deleted_at: string }>("deleted_case", { case_id: uuid, deleted_at: utc });

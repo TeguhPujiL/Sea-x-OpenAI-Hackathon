@@ -56,6 +56,8 @@ def test_clean_run_reports_gap_without_generating_fake_downstream_resources(tmp_
         "ai_execution": {"model": "actual-test-model", "schema_valid": True, "evidence_validation_passed": True}}
     def handler(request):
         path = request.url.path
+        if path == "/auth/session":
+            return httpx.Response(200, json=envelope({"authenticated": True}))
         if request.method == "POST":
             posts.append(path)
         if path.endswith("/health"):
@@ -93,3 +95,24 @@ def test_clean_run_reports_gap_without_generating_fake_downstream_resources(tmp_
     assert report["status"] == "BLOCKED_CONTRACT_G01"
     assert all(check["status"] == "PASS" for check in report["checks"])
     assert not any(path.endswith(("/challenges", "/simulations", "/repair-proposals")) for path in posts)
+
+
+def test_local_login_credentials_are_not_reported(tmp_path, monkeypatch):
+    monkeypatch.setenv("PROCUREMIND_LOGIN_USERNAME", "test-local-user")
+    monkeypatch.setenv("PROCUREMIND_LOGIN_PASSWORD", "test-local-password-only")
+    seen = []
+    def handler(request):
+        seen.append(request.url.path)
+        if request.url.path == "/auth/session":
+            return httpx.Response(200, json={"data": {"authenticated": False}})
+        body = json.loads(request.content)
+        assert body == {"username": "test-local-user", "password": "test-local-password-only"}
+        return httpx.Response(200, json={"data": {"authenticated": True}},
+            headers={"set-cookie": "procuremind_session=test-only-session; Path=/; HttpOnly"})
+    client = httpx.Client(base_url="http://127.0.0.1:8002", transport=httpx.MockTransport(handler))
+    bot = PositiveCaseBot("http://127.0.0.1:8002", tmp_path, tmp_path / "report.json", client=client)
+    bot.authenticate()
+    assert seen == ["/auth/session", "/auth/login"]
+    assert "test-local-password-only" not in json.dumps(bot.report)
+    assert client.cookies["procuremind_session"] == "test-only-session"
+    client.close()

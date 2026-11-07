@@ -104,11 +104,30 @@ class PositiveCaseBot:
             assert data["items"], "Truncated pagination"
             offset += len(data["items"])
 
+    def authenticate(self):
+        """Use the new local login when present; never put credentials in reports."""
+        response = self.client.get("/auth/session")
+        if response.status_code == 404:
+            return  # Compatibility with the earlier local composition.
+        response.raise_for_status()
+        state = response.json()["data"]
+        if state["authenticated"]:
+            return
+        from app.core.login import LoginSettings
+        config = LoginSettings()
+        if not config.password:
+            raise ValueError("Configure local login credentials in the ignored .env before running the bot")
+        login = self.client.post("/auth/login", json={"username": config.username,
+            "password": config.password.get_secret_value()})
+        if login.status_code != 200 or not login.json().get("data", {}).get("authenticated"):
+            raise ValueError("Local login failed; check PROCUREMIND_LOGIN_USERNAME and PROCUREMIND_LOGIN_PASSWORD")
+
     def run(self):
         try:
             root, files, manifest = inventory(self.dataset)
             self.report.update(dataset=str(root), files=files, control_manifest=manifest)
             self.check("all_folder_files_accounted_for", bool(files), {"pdfs": len(files), "control_files": 1})
+            self.authenticate()
             health = self.request("GET", "/health")
             self.check("explicit_backend_demo_identity", health["demo_mode"] is True)
             case_input = {"title": "Positive corpus QA " + self.run_id[:8], "category": "IT_EQUIPMENT",

@@ -153,25 +153,6 @@ test("NEEDS_REVIEW warnings and FAILED retryable are displayed separately from s
   assert.match(view({ resources, ids: fullIds(), step: 1 }), /EVIDENCE_EXCERPT_NOT_FOUND/);
   resources.job = jobResource("FAILED"); const html = view({ resources, ids: fullIds(), step: 1 }); assert.match(html, /AI_PROVIDER_TIMEOUT/); assert.match(html, /Retryable: true/);
 });
-
-test("provider failures with a null runtime model remain readable and retryable", () => {
-  const job = { ...jobResource("FAILED"), ai_execution: { ...jobResource().ai_execution,
-    model: null, schema_valid: false, evidence_validation_passed: false,
-    evidence_checks: { checked: 0, passed: 0, failed: 0 }, usage: null } };
-  assert.deepEqual(decodeJob(job), job);
-  const html = view({ resources: { ...fullResources(), job }, ids: fullIds(), step: 1 });
-  assert.match(html, /AI_PROVIDER_TIMEOUT/);
-  assert.match(html, /Not returned by provider/);
-  assert.match(html, /Retryable: true/);
-  assert.doesNotMatch(html, /synthetic-test-model|does not match API Contract/);
-});
-
-test("execution model still rejects missing or malformed values", () => {
-  for (const model of [undefined, 123, false, {}, []]) {
-    const job = jobResource(); job.ai_execution.model = model;
-    assert.throws(() => decodeJob(job), /job.ai_execution/);
-  }
-});
 test("storage allowlist excludes case versions, step, contents, and reviewer identity", () => {
   const storage = memoryStorage(); saveIds(storage, { ...fullIds(), current_step: 5, case_version: 99, api_key: "sensitive", reviewer: reviewResource().reviewer, proposed_text: "confidential" });
   const raw = storage.getItem(storageKey); assert.deepEqual(Object.keys(JSON.parse(raw)).sort(), Object.keys(emptyIds()).sort());
@@ -199,9 +180,162 @@ test("all six steps, labelled controls, skip link and current-step semantics are
   assert.match(html, /aria-live="polite"/); assert.match(html, /Synthetic data/); assert.match(html, /statutory procurement approval/);
 });
 test("recorded review is immutable UI and preserves server reviewer/audit provenance", () => {
-  const resources = fullResources(); resources.repair.status = "APPROVED"; resources.reviews = [reviewResource()]; resources.audit = [{ ...auditResource(), event_hash: "test-only-event-hash" }];
-  const html = view({ resources, ids: fullIds(), step: 5 }); assert.match(html, /Synthetic test reviewer/); assert.match(html, new RegExp(IDs.actor)); assert.match(html, /Audit timeline/); assert.match(html, /test-only-event-hash/);
+  const resources = fullResources(); resources.repair.status = "APPROVED"; resources.reviews = [reviewResource()]; resources.audit = [auditResource()];
+  const html = view({ resources, ids: fullIds(), step: 5 }); assert.match(html, /Synthetic test reviewer/); assert.match(html, new RegExp(IDs.actor)); assert.match(html, /Audit timeline/); assert.match(html, /hash chain not implemented/);
   assert.doesNotMatch(html, /<select name="decision"/); assert.doesNotMatch(html, /Record internal review<\/button>/); assert.equal(canReview(resources), false);
+});
+test("complete synthetic contract journey, stale repair, and authoritative refresh recovery", async () => {
+  const backend = fixtureBackend(); const client = createClient(config, backend.fetcher);
+  const c = await client.prepare("POST", "/cases", decodeCase, { status: 201, body: { title: "Synthetic frontend integration test", category: "IT_EQUIPMENT", description: "TEST ONLY", quantity: 50, budget_ceiling_idr: 900000000, currency: "IDR" } }).send();
+  for (const type of ["TOR", "TECHNICAL_SPECIFICATION"]) {
+    const form = new FormData(); form.append("file", new File(["%PDF-test"], "fixture.pdf", { type: "application/pdf" })); form.append("document_type", type);
+    await client.prepare("POST", `/cases/${c.case_id}/documents`, decodeDocument, { status: 201, multipart: form }).send();
+  }
+  const job = await client.prepare("POST", `/cases/${IDs.case}/analyses`, decodeJob, { status: 202, body: { document_ids: [IDs.tor, IDs.spec], analysis_types: ["REQUIREMENT_EXTRACTION", "CONTRADICTION_DETECTION"], force_reanalysis: false } }).send();
+  assert.equal(job.status, "QUEUED"); await pollJob(() => client.get(`/jobs/${job.job_id}`, decodeJob), noop, new AbortController().signal, async () => {});
+  const ids = { ...emptyIds(), case_id: c.case_id, analysis_job_id: job.job_id };
+  const assessment = await loadWorkspace(client, ids); assert.equal(assessment.findings.length, 1); ids.selected_finding_id = assessment.findings[0].finding_id;
+  const challenge = await client.prepare("POST", `/cases/${IDs.case}/challenges`, decodeChallenge, { status: 201, body: { finding_id: IDs.finding, generation_mode: "AI_ASSISTED", requested_evidence: ["TECHNICAL_JUSTIFICATION"] } }).send(); ids.challenge_id = challenge.challenge_id;
+  const simulation = await client.prepare("POST", `/cases/${IDs.case}/simulations`, decodeSimulation, { status: 201, body: { finding_id: IDs.finding, baseline: { minimum_ram_gb: 32 }, alternative: { minimum_ram_gb: 16 }, supplier_data_version: "synthetic-suppliers-v1" } }).send(); ids.simulation_id = simulation.simulation_id;
+  const repair = await client.prepare("POST", `/findings/${IDs.finding}/repair-proposals`, decodeRepair, { status: 201, body: { action_type: "REVISE_REQUIREMENT", simulation_id: simulation.simulation_id, generation_mode: "AI_ASSISTED" } }).send(); ids.repair_proposal_id = repair.repair_proposal_id;
+  backend.state.conflict = true;
+  await assert.rejects(client.prepare("PATCH", `/repair-proposals/${repair.repair_proposal_id}`, decodeRepair, { body: { proposed_text: "Local text", expected_version: 1 } }).send(), e => e instanceof RequestError && e.body.code === "VERSION_CONFLICT");
+  const reconciled = await loadWorkspace(client, ids); assert.equal(reconciled.repair.version, 2); assert.equal(reconciled.repair.proposed_text, "Newer server text for reconciliation.");
+  const saved = await client.prepare("PATCH", `/repair-proposals/${repair.repair_proposal_id}`, decodeRepair, { body: { proposed_text: "Human-reviewed text", expected_version: 2 } }).send(); assert.equal(saved.version, 3);
+  await client.prepare("PATCH", `/repair-proposals/${repair.repair_proposal_id}`, decodeRepair, { body: { proposed_text: saved.proposed_text, status: "SUBMITTED", expected_version: 3 } }).send();
+  const beforeReview = await loadWorkspace(client, ids); assert.equal(canReview(beforeReview), true);
+  await client.prepare("POST", `/cases/${IDs.case}/reviews`, decodeReview, { status: 201, body: { repair_proposal_id: IDs.repair, decision: "APPROVE_DRAFT", decision_reason: "The documented revision resolves the contradiction.", expected_case_version: beforeReview.caseResource.version } }).send();
+  const storage = memoryStorage(); saveIds(storage, ids); const recovered = await loadWorkspace(client, readIds(storage));
+  assert.equal(recovered.reviews.length, 1); assert.equal(recovered.audit.length, 1); assert.equal(recovered.reviews[0].reviewer.actor_id, IDs.actor); assert.equal(recoveredStep(recovered), 5); assert.equal(canReview(recovered), false);
+  const requests = backend.state.requests;
+  assert.ok(requests.every(v => !v.body || v.body instanceof FormData || !Object.hasOwn(v.body, "reviewer_actor_id")));
+  const simulationRequest = requests.find(v => v.method === "POST" && v.path.endsWith("/simulations")); assert.deepEqual(Object.keys(simulationRequest.body).sort(), ["alternative", "baseline", "finding_id", "supplier_data_version"]);
+  assert.equal(requests.find(v => v.method === "POST" && v.path.endsWith("/challenges")).key, null);
+});
+
+
+test("audit reads accept the owner's explicit null hashes without fabricating provenance", async () => {
+  const event = auditResource();
+  const client = createClient(config, async () => Response.json(envelope(page([event]))));
+  const audit = await listAll(client, `/cases/${IDs.case}/audit`, decodeAudit);
+  assert.equal(audit.length, 1);
+  assert.equal(audit[0].event_hash, null);
+  assert.equal(audit[0].previous_hash, null);
+  assert.equal(decodeAudit({ ...event, event_hash: "stored-hash" }).event_hash, "stored-hash");
+  for (const bad of [undefined, 123, {}, false]) {
+    assert.throws(() => decodeAudit({ ...event, event_hash: bad }), ShapeError);
+    assert.throws(() => decodeAudit({ ...event, previous_hash: bad }), ShapeError);
+  }
+  const legacy = decodeAudit({ ...event, actor: { actor_id: IDs.actor, display_name: null, role: null } });
+  const resources = fullResources(); resources.audit = [legacy];
+  const html = view({ resources, ids: fullIds(), step: 5 });
+  assert.match(html, /Actor name unavailable/);
+  assert.match(html, /hash chain not implemented/);
+  assert.throws(() => decodeReview({ ...reviewResource(), reviewer: legacy.actor }), ShapeError);
+});
+
+
+test("failed job with no provider response decodes and displays the authoritative failure", async () => {
+  const job = jobResource("FAILED");
+  job.ai_execution = { ...jobResource().ai_execution, model: null, schema_valid: false, evidence_validation_passed: false, evidence_checks: { checked: 0, passed: 0, failed: 0 }, usage: null };
+  job.error = { code: "AI_PROVIDER_ERROR", message: "Analysis could not produce a usable validated result.", retryable: false };
+  const client = createClient(config, async () => Response.json(envelope(job)));
+  const loaded = await client.get(`/jobs/${IDs.job}`, decodeJob);
+  assert.equal(loaded.status, "FAILED");
+  assert.equal(loaded.ai_execution.model, null);
+  const resources = fullResources(); resources.job = loaded; resources.findings = [];
+  const html = view({ resources, ids: fullIds(), step: 1 });
+  assert.match(html, /AI_PROVIDER_ERROR/);
+  assert.match(html, /Not reported \(no provider response\)/);
+  assert.doesNotMatch(html, /No integrity findings detected/);
+  assert.throws(() => decodeJob({ ...job, ai_execution: { ...job.ai_execution, model: 123 } }), ShapeError);
+  const { model, ...missingModel } = job.ai_execution;
+  assert.throws(() => decodeJob({ ...job, ai_execution: missingModel }), ShapeError);
+});
+
+test("audit refresh accepts null hashes returned by the backend after clean analysis", async () => {
+  const event = { ...auditResource(), event_type: "ANALYSIS_COMPLETED", resource: { type: "job", id: IDs.job, version: 1 }, details: { finding_count: 0 }, event_hash: null, previous_hash: null };
+  const client = createClient(config, async () => Response.json(envelope(page([event]))));
+  const events = await listAll(client, `/cases/${IDs.case}/audit`, decodeAudit);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].event_hash, null);
+  const resources = { ...emptyResources(), caseResource: caseResource(), job: jobResource("COMPLETED", true), audit: events };
+  const html = view({ resources, step: 5 });
+  assert.match(html, /Clean-case completion pending contract decision/);
+  assert.match(html, /analysis completed/i);
+  assert.match(html, /hash chain not implemented/);
+  assert.doesNotMatch(html, /Unable to continue/);
+});
+test("audit accepts unknown legacy actor names without weakening reviewer validation", () => {
+  const event = { ...auditResource(), actor: { actor_id: IDs.actor, display_name: null, role: null }, event_hash: null };
+  assert.equal(decodeAudit(event).actor.actor_id, IDs.actor);
+  const resources = { ...fullResources(), audit: [event] };
+  assert.match(view({ resources, step: 5 }), /Actor name unavailable/);
+  assert.throws(() => decodeReview({ ...reviewResource(), reviewer: event.actor }), ShapeError);
+});
+test("audit rejects invalid hash values and missing fields", () => {
+  for (const field of ["event_hash", "previous_hash"]) {
+    for (const value of [42, true, {}, [], undefined]) {
+      assert.throws(() => decodeAudit({ ...auditResource(), [field]: value }), ShapeError);
+    }
+  }
+  assert.equal(decodeAudit({ ...auditResource(), event_hash: "test-only-event-hash" }).event_hash, "test-only-event-hash");
+});
+
+
+test("uploaded documents expose removal while active analysis disables it", () => {
+  const resources = fullResources();
+  const html = view({ resources, ids: fullIds(), step: 0 });
+  assert.match(html, /Remove document/);
+  assert.match(html, /aria-label="Remove test-tor.pdf"/);
+  resources.job = jobResource("PROCESSING");
+  const busy = view({ resources, ids: fullIds(), step: 0 });
+  assert.match(busy, /disabled=""[^>]*aria-label="Remove test-tor.pdf"/);
+});
+
+
+test("failed analysis with no provider response retains null model and original error", () => {
+  const job = { ...jobResource("FAILED"), error: { code: "AI_PROVIDER_ERROR", message: "AI provider is unavailable", retryable: false },
+    ai_execution: { ...jobResource().ai_execution, model: null, usage: null, schema_valid: false,
+      evidence_validation_passed: false, evidence_checks: { checked: 0, passed: 0, failed: 0 } } };
+  assert.equal(decodeJob(job).ai_execution.model, null);
+  const html = view({ resources: { ...emptyResources(), job }, step: 1 });
+  assert.match(html, /AI_PROVIDER_ERROR/);
+  assert.match(html, /Not reported \(no provider response\)/);
+  assert.doesNotMatch(html, /Unable to continue/);
+  for (const model of [42, true, {}, [], undefined]) {
+    assert.throws(() => decodeJob({ ...job, ai_execution: { ...job.ai_execution, model } }), ShapeError);
+  }
+  assert.equal(decodeJob(jobResource()).ai_execution.model, "synthetic-test-model");
+});
+
+
+test("document types save together at the footer and unsaved choices block Assess", () => {
+  const docs = [documentResource(), documentResource("TECHNICAL_SPECIFICATION")];
+  const base = { resources: { ...emptyResources(), caseResource: caseResource(), documents: docs }, ids: { ...emptyIds(), case_id: IDs.case } };
+  const html = view({ ...base, documentTypeDrafts: { [IDs.tor]: "OTHER" } });
+  assert.equal((html.match(/>Save document types<\/button>/g) ?? []).length, 1);
+  assert.match(html, /Save document types<\/button><button[^>]*disabled=""[^>]*>Continue to Assess/);
+  assert.match(view(base), /disabled=""[^>]*>Save document types/);
+});
+
+test("provider failures with a null runtime model remain readable and retryable", () => {
+  const job = { ...jobResource("FAILED"), ai_execution: { ...jobResource().ai_execution,
+    model: null, schema_valid: false, evidence_validation_passed: false,
+    evidence_checks: { checked: 0, passed: 0, failed: 0 }, usage: null } };
+  assert.deepEqual(decodeJob(job), job);
+  const html = view({ resources: { ...fullResources(), job }, ids: fullIds(), step: 1 });
+  assert.match(html, /AI_PROVIDER_TIMEOUT/);
+  assert.match(html, /Not reported \(no provider response\)/);
+  assert.match(html, /Retryable: true/);
+  assert.doesNotMatch(html, /synthetic-test-model|does not match API Contract/);
+});
+
+test("execution model still rejects missing or malformed values", () => {
+  for (const model of [undefined, 123, false, {}, []]) {
+    const job = jobResource(); job.ai_execution.model = model;
+    assert.throws(() => decodeJob(job), /job.ai_execution/);
+  }
 });
 
 test("audit accepts explicit null hashes from the backend without fabricating provenance", () => {
@@ -249,36 +383,8 @@ test("06 Assure refresh loads unchained audit history and renders its missing pr
   const html = view({ resources: restored, step: 5 });
   assert.match(html, /Recorded internal review/);
   assert.match(html, /Audit timeline/);
-  assert.match(html, /Event hash: <code>Not recorded<\/code>/);
-  assert.match(html, /Actor name not recorded/);
+  assert.match(html, /Event hash: <code>Unavailable \(G14: hash chain not implemented\)<\/code>/);
+  assert.match(html, /Actor name unavailable/);
   assert.match(html, new RegExp(`Actor ID: <code>${IDs.actor}</code>`));
   assert.doesNotMatch(html, /test-only-event-hash|does not match API Contract/);
-});
-test("complete synthetic contract journey, stale repair, and authoritative refresh recovery", async () => {
-  const backend = fixtureBackend(); const client = createClient(config, backend.fetcher);
-  const c = await client.prepare("POST", "/cases", decodeCase, { status: 201, body: { title: "Synthetic frontend integration test", category: "IT_EQUIPMENT", description: "TEST ONLY", quantity: 50, budget_ceiling_idr: 900000000, currency: "IDR" } }).send();
-  for (const type of ["TOR", "TECHNICAL_SPECIFICATION"]) {
-    const form = new FormData(); form.append("file", new File(["%PDF-test"], "fixture.pdf", { type: "application/pdf" })); form.append("document_type", type);
-    await client.prepare("POST", `/cases/${c.case_id}/documents`, decodeDocument, { status: 201, multipart: form }).send();
-  }
-  const job = await client.prepare("POST", `/cases/${IDs.case}/analyses`, decodeJob, { status: 202, body: { document_ids: [IDs.tor, IDs.spec], analysis_types: ["REQUIREMENT_EXTRACTION", "CONTRADICTION_DETECTION"], force_reanalysis: false } }).send();
-  assert.equal(job.status, "QUEUED"); await pollJob(() => client.get(`/jobs/${job.job_id}`, decodeJob), noop, new AbortController().signal, async () => {});
-  const ids = { ...emptyIds(), case_id: c.case_id, analysis_job_id: job.job_id };
-  const assessment = await loadWorkspace(client, ids); assert.equal(assessment.findings.length, 1); ids.selected_finding_id = assessment.findings[0].finding_id;
-  const challenge = await client.prepare("POST", `/cases/${IDs.case}/challenges`, decodeChallenge, { status: 201, body: { finding_id: IDs.finding, generation_mode: "AI_ASSISTED", requested_evidence: ["TECHNICAL_JUSTIFICATION"] } }).send(); ids.challenge_id = challenge.challenge_id;
-  const simulation = await client.prepare("POST", `/cases/${IDs.case}/simulations`, decodeSimulation, { status: 201, body: { finding_id: IDs.finding, baseline: { minimum_ram_gb: 32 }, alternative: { minimum_ram_gb: 16 }, supplier_data_version: "synthetic-suppliers-v1" } }).send(); ids.simulation_id = simulation.simulation_id;
-  const repair = await client.prepare("POST", `/findings/${IDs.finding}/repair-proposals`, decodeRepair, { status: 201, body: { action_type: "REVISE_REQUIREMENT", simulation_id: simulation.simulation_id, generation_mode: "AI_ASSISTED" } }).send(); ids.repair_proposal_id = repair.repair_proposal_id;
-  backend.state.conflict = true;
-  await assert.rejects(client.prepare("PATCH", `/repair-proposals/${repair.repair_proposal_id}`, decodeRepair, { body: { proposed_text: "Local text", expected_version: 1 } }).send(), e => e instanceof RequestError && e.body.code === "VERSION_CONFLICT");
-  const reconciled = await loadWorkspace(client, ids); assert.equal(reconciled.repair.version, 2); assert.equal(reconciled.repair.proposed_text, "Newer server text for reconciliation.");
-  const saved = await client.prepare("PATCH", `/repair-proposals/${repair.repair_proposal_id}`, decodeRepair, { body: { proposed_text: "Human-reviewed text", expected_version: 2 } }).send(); assert.equal(saved.version, 3);
-  await client.prepare("PATCH", `/repair-proposals/${repair.repair_proposal_id}`, decodeRepair, { body: { proposed_text: saved.proposed_text, status: "SUBMITTED", expected_version: 3 } }).send();
-  const beforeReview = await loadWorkspace(client, ids); assert.equal(canReview(beforeReview), true);
-  await client.prepare("POST", `/cases/${IDs.case}/reviews`, decodeReview, { status: 201, body: { repair_proposal_id: IDs.repair, decision: "APPROVE_DRAFT", decision_reason: "The documented revision resolves the contradiction.", expected_case_version: beforeReview.caseResource.version } }).send();
-  const storage = memoryStorage(); saveIds(storage, ids); const recovered = await loadWorkspace(client, readIds(storage));
-  assert.equal(recovered.reviews.length, 1); assert.equal(recovered.audit.length, 1); assert.equal(recovered.reviews[0].reviewer.actor_id, IDs.actor); assert.equal(recoveredStep(recovered), 5); assert.equal(canReview(recovered), false);
-  const requests = backend.state.requests;
-  assert.ok(requests.every(v => !v.body || v.body instanceof FormData || !Object.hasOwn(v.body, "reviewer_actor_id")));
-  const simulationRequest = requests.find(v => v.method === "POST" && v.path.endsWith("/simulations")); assert.deepEqual(Object.keys(simulationRequest.body).sort(), ["alternative", "baseline", "finding_id", "supplier_data_version"]);
-  assert.equal(requests.find(v => v.method === "POST" && v.path.endsWith("/challenges")).key, null);
 });

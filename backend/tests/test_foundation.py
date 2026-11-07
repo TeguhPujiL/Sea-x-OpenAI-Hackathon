@@ -20,7 +20,7 @@ from app.models import Base, Case, AiExecution, AuditEvent, AnalysisJob, Finding
 from app.schemas import shared
 
 
-def test_health_openapi_and_safe_errors():
+def test_health_openapi_and_safe_errors(caplog):
     app = create_app(Settings(database_url="sqlite:///:memory:"))
 
     @app.post("/test-validation")
@@ -52,6 +52,10 @@ def test_health_openapi_and_safe_errors():
         failure = client.get("/test-crash")
         assert failure.status_code == 500
         assert "private-provider-secret" not in failure.text
+        assert "private-provider-secret" not in caplog.text
+        assert failure.json()["meta"]["request_id"] in caplog.text
+        assert "error_type=RuntimeError" in caplog.text
+        assert "test_foundation.py" in caplog.text
 
 
 def test_integrated_routes_match_contract():

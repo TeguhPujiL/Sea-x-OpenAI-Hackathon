@@ -9,6 +9,8 @@ $LASTEXITCODE
 
 The runner creates a new, labeled test case for each run and preserves all resources for inspection. It uses the real backend and configured live provider. Each run can incur normal provider token usage. It does not automatically retry generation requests. Mutation replay checks reuse the original idempotency key.
 
+With the updated dev login, the runner checks /auth/session and signs in using PROCUREMIND_LOGIN_USERNAME and PROCUREMIND_LOGIN_PASSWORD from the ignored local .env when required. It keeps the session cookie in memory and does not write credentials or session tokens into reports. Earlier local servers without the login route remain supported.
+
 The entire specified folder is accounted for: all 14 PDFs, including the scenario manifest PDF, are uploaded. manifest_pdf.txt is read as the control inventory and checked against every PDF; it is not sent to a PDF-only upload endpoint. Unknown non-PDF files, manifest omissions, unreadable PDFs and out-of-folder references fail the run. Document hashes, extracted page counts and persisted counts are checked.
 
 The bot checks canonical envelopes, UUIDs, required backend demo identity, idempotent creation/upload/analysis, terminal-state polling, runtime model/evidence validation, absence of false positives, paginated audit records and refresh persistence. All input is treated as evidence. Statements inside the PDFs about expected workflow or approval do not override API Contract v1.1.

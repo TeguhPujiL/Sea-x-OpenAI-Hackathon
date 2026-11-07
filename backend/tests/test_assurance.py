@@ -60,24 +60,18 @@ def test_decision_semantics_with_resolved_verified_evidence(qa, decision):
     assert result["assurance_status_after"] == expected
 
 
-@pytest.mark.parametrize("change", ["unresolved", "unverified", "conflicting", "insufficient", "no_disposition", "bad_excerpt", "job_warning", "unusable_job", "other_finding"])
+@pytest.mark.parametrize("change,qa", [(change, change) for change in [
+    "unresolved", "unverified", "conflicting", "insufficient", "no_disposition",
+    "bad_excerpt", "job_warning", "unusable_job", "other_finding",
+]], indirect=["qa"])
 def test_assurance_cannot_complete_with_blockers(qa, change):
     with Session(qa.engine) as session:
         finding = session.get(Finding, qa.chain.finding.id)
         finding.status, finding.resolution_note = "RESOLVED", "Documented source disposition."
         if change == "unresolved":
             finding.status = "UNDER_REVIEW"
-        elif change in {"unverified", "conflicting", "insufficient"}:
-            finding.evidence_status = change.upper()
         elif change == "no_disposition":
             finding.resolution_note = None
-        elif change == "bad_excerpt":
-            session.scalars(select(EvidenceRef)).first().excerpt = "Not present on source page"
-        elif change == "job_warning":
-            job = session.get(AnalysisJob, qa.chain.job.id)
-            job.processing_status, job.warnings_json = "NEEDS_REVIEW", [{"code": "EVIDENCE_EXCERPT_NOT_FOUND"}]
-        elif change == "unusable_job":
-            session.get(AnalysisJob, qa.chain.job.id).result_json = None
         elif change == "other_finding":
             session.add(Finding(case_id=finding.case_id, analysis_job_id=finding.analysis_job_id,
                 ai_execution_id=finding.ai_execution_id, type="TEST_ONLY", severity="LOW",

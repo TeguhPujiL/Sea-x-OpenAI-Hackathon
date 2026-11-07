@@ -1,0 +1,17 @@
+.git
+.env
+.env.*
+!.env.example
+.venv
+.tools
+.runtime
+.storage
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+**/*.egg-info
+**/*.db
+**/*.db-*
+**/.DS_Store

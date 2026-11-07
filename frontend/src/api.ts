@@ -61,6 +61,7 @@ export function createClient(config: ClientConfig, fetcher: Fetch = fetch, newId
         }
         const envelope = decodeEnvelope(raw, config.development ? decoder : (value => { object(value); return decoder(value); }));
         lastMeta = envelope.meta;
+        if (!envelope.success && response.status === 401 && typeof window !== "undefined") window.dispatchEvent(new Event("procuremind:session-expired"));
         if (!envelope.success) throw new RequestError(response.status, envelope.error, envelope.meta.request_id, response.headers.get("Retry-After"));
         if (response.status !== (options.status ?? 200)) throw new ShapeError(`Expected HTTP ${options.status ?? 200}, received ${response.status}.`);
         if (!response.ok) throw new ShapeError(`HTTP ${response.status} cannot carry a success envelope.`);

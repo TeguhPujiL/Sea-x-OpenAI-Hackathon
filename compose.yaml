@@ -1,0 +1,20 @@
+name: procuremind-local
+services:
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:${PROCUREMIND_HTTP_PORT:-18000}:8000"
+    env_file:
+      - path: .env
+        format: raw
+    environment:
+      PROCUREMIND_DATABASE_URL: sqlite:////data/procuremind.db
+      PROCUREMIND_STORAGE_ROOT: /data/pdfs
+      PROCUREMIND_DEMO_MODE: "true"
+      PROCUREMIND_LOGIN_ENABLED: "true"
+    volumes:
+      - procuremind_data:/data
+    restart: unless-stopped
+    stop_grace_period: 30s
+volumes:
+  procuremind_data:

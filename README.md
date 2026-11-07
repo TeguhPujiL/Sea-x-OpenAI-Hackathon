@@ -90,3 +90,7 @@ Configure the username/password in the ignored root `.env` first.
 SQLite, uploaded PDFs, and the backend actor identity persist in a named volume.
 See [local Docker testing and storage](docs/LOCAL_DOCKER.md) for setup, restart,
 persistence, deletion behavior and limitations.
+
+P1 Evaluation Integrity and Supplier Readiness are implemented as an opt-in, **PROPOSED** extension. See [P1 addendum](docs/P1_CONTRACT_ADDENDUM.md) and [integration instructions](docs/P1_INTEGRATION.md); activation requires Integration Lead approval and an explicit additive migration. P0 remains the default.
+
+Batch PDF upload with optional AI document typing: see [DC1 classification and validation](docs/DOCUMENT_CLASSIFICATION_VERIFICATION.md). The existing nine DocumentType values and manual type editor are retained.

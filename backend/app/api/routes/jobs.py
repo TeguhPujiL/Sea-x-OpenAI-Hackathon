@@ -42,6 +42,11 @@ def retry_job(job_id: UUID4, payload: RetryRequest, request: Request, background
     actor: Annotated[Actor, Depends(require_scope("analysis:write"))]):
     with write_transaction(request) as db:
         original = resource_for(db, actor, AnalysisJob, job_id)
+        from sqlalchemy import inspect
+        if "p1_checks" in inspect(db.bind).get_table_names():
+            from app.models.p1 import AssessmentCheck
+            if db.scalar(select(AssessmentCheck.id).where(AssessmentCheck.job_id == original.id)):
+                raise ApiError(409, "INVALID_STATE_TRANSITION", "Create a new P1 assessment or revalidation instead of a P0 retry")
         if original.processing_status not in {"FAILED", "NEEDS_REVIEW"}:
             raise ApiError(409, "INVALID_STATE_TRANSITION", "Only FAILED or NEEDS_REVIEW jobs may be retried")
         case = case_for(db, actor, original.case_id)

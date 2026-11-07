@@ -49,6 +49,22 @@ def create_app(settings: Settings | None = None, *, simulation_lookup: Simulatio
     app.add_middleware(UploadLimitMiddleware, max_bytes=config.upload_max_bytes)
     app.dependency_overrides[get_settings] = lambda: config
     app.include_router(router, prefix="/api/v1")
+    if config.document_classification_enabled:
+        app.version = "1.1+dc1-proposed"
+        app.description += " DC1 automatic document classification is an explicitly enabled proposed extension."
+        from app.api.routes import document_classification
+        from app.services.ai.classification import ClassificationProvider
+        app.state.classification_provider = ClassificationProvider(config)
+        app.include_router(document_classification.router, prefix="/api/v1")
+    if config.p1_enabled:
+        app.version = "1.1+p1.1-proposed"
+        app.description += " P1.1 extensions are PROPOSED and explicitly enabled for integration testing."
+        from app.api.routes import evaluation_checks, supplier_readiness
+        from app.services.ai.p1 import P1Provider
+        app.state.p1_provider = P1Provider(config)
+        app.include_router(evaluation_checks.router, prefix="/api/v1")
+        app.include_router(supplier_readiness.router, prefix="/api/v1")
+
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):
@@ -104,10 +120,12 @@ def create_app(settings: Settings | None = None, *, simulation_lookup: Simulatio
                     for status, description in ((400, "Validation error"), (401, "Authentication required"), (403, "Forbidden"), (404, "Resource not found"), (409, "Version/state/idempotency conflict"), (500, "Internal error")):
                         operation["responses"].setdefault(str(status), {"description": description,
                             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EnvelopeError"}}}})
+                    if config.p1_enabled and method == "post" and ("/evaluation-checks" in path or "/supplier-readiness-checks" in path):
+                        operation["responses"]["422"] = {"description": "Selected document has no extracted evidence", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EnvelopeError"}}}}
                     if method == "post" and path.endswith("/documents"):
                         for status in (413, 415, 422):
                             operation["responses"][str(status)] = {"description": "PDF upload rejection", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EnvelopeError"}}}}
-                    if method == "post" and path.endswith(("/challenges", "/repair-proposals")):
+                    if method == "post" and path.endswith(("/challenges", "/repair-proposals", "/classifications")):
                         for status in (422, 429, 502, 504):
                             operation["responses"][str(status)] = {"description": "Decision evidence/provider error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EnvelopeError"}}}}
                         operation["responses"]["429"]["headers"] = {"Retry-After": {"description": "Provider-requested delay when available", "schema": {"type": "string"}}}

@@ -1,9 +1,9 @@
 import type { ApiClient } from "./api";
 import { decodeDocument, ShapeError, type DocumentResource, type DocumentType } from "./contracts";
-export async function saveDocumentTypes(client: ApiClient, documents: DocumentResource[], drafts: Record<string, DocumentType>, saved: (doc: DocumentResource) => void, signal: AbortSignal) {
+export async function saveDocumentTypes(client: ApiClient, documents: DocumentResource[], drafts: Record<string, DocumentType>, saved: (doc: DocumentResource) => void, signal: AbortSignal, confirmUnchanged: ReadonlySet<string> = new Set()) {
   for (const document of documents) {
     const type = drafts[document.document_id];
-    if (!type || type === document.document_type) continue;
+    if (!type || type === document.document_type && !confirmUnchanged.has(document.document_id)) continue;
     const value = await client.prepare("PATCH", `/documents/${document.document_id}`, decodeDocument, {
       body: { document_type: type, expected_version: document.version },
     }).send(signal);

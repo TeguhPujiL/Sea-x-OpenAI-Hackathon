@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", env_prefix="PROCUREMIND_", extra="ignore")
     database_url: str = "sqlite:///./procuremind.db"
+    document_classification_enabled: bool = False  # DC1 opt-in extension.
+    p1_enabled: bool = False  # PROPOSED P1.1; requires explicit addendum approval.
     demo_mode: bool = False
     demo_actor_id: UUID4 | None = None
     demo_display_name: str = "Demo Analyst"

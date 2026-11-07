@@ -132,3 +132,13 @@ Contract pages 32-33 illustrate string previous_hash/event_hash and describe tam
 The frontend accepts explicit null hashes so existing audit records remain readable and labels unavailable event hashes. It does not manufacture hashes or claim chain verification. Missing fields and non-string/non-null values remain invalid. Historical actor snapshots may also have explicit null name/role; the frontend displays unavailable identity metadata without inventing it, while reviews still require complete reviewer snapshots.
 
 PROPOSED: Assurance owner to implement and test deterministic chained hashing with concurrency and legacy-record handling, or obtain a versioned contract revision explicitly allowing absent hashes. No existing immutable audit records are rewritten by this UI fix. Clean-case completion remains G01 and is not unlocked by this compatibility handling.
+
+
+## G15 - Proposed P1.1 integrity and readiness extensions
+
+Status: **OPEN / PROPOSED ADDENDUM**. The user requested execution of both prompts in the 15-page Prompting P1.pdf. Concrete proposed routes, schemas, status distinctions, access/idempotency policies and migration are recorded in P1_CONTRACT_ADDENDUM.md. Existing v1.1 routes/enums remain unchanged. The seven additional method/path pairs are behind PROCUREMIND_P1_ENABLED=false by default; no shared-environment activation is authorized by the proposal itself. Dedicated supplier self-service identity/ACL and external validity verification remain unresolved. Evaluation findings reuse existing versioned human actions and delegated audit, not new review endpoints. G01 clean-case completion remains open.
+
+
+## G16 - Proposed DC1 automatic document typing
+
+Status: **OPEN / PROPOSED ADDENDUM**, separately opted into the local pilot at the user's request. DOCUMENT_CLASSIFICATION_ADDENDUM.md specifies the new proposal endpoint and the unchanged upload/PATCH contracts. The user explicitly requested bulk PDF upload and automatic mapping into the nine existing types; this later instruction authorizes frontend integration for DC1. The DC1 request did not authorize the separate P1.1 assessment endpoints. The user subsequently authorized local P1 pilot activation on 7 November 2026; shared-environment approval remains pending. Low-confidence, unknown, mixed-role and unsupported citations require human review; no claim of perfect classification accuracy is made. A shared deployment still requires review of DC1.

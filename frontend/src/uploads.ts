@@ -1,7 +1,10 @@
 import { RequestError, TransportError, type ApiClient, type PreparedRequest } from "./api";
 import { decodeDocument, ShapeError, type DocumentResource } from "./contracts";
 export type UploadStatus = "pending" | "uploading" | "uploaded" | "failed" | "unknown" | "unverified";
+import type { Classification } from "./classification";
 export interface UploadItem {
+  classificationStatus?: "classifying" | "ready" | "needs_review" | "failed" | "unknown";
+  classificationError?: string; classification?: Classification; classificationRequest?: PreparedRequest<Classification>; typeRequest?: PreparedRequest<DocumentResource>;
   id: string; file: File; description: string; status: UploadStatus; error?: string;
   request?: PreparedRequest<DocumentResource>; document?: DocumentResource;
 }

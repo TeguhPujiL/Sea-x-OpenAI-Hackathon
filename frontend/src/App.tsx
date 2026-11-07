@@ -8,6 +8,7 @@ import { CaseHistory } from "./CaseHistory";
 import { readCaseHistory, rememberCase, caseHistoryKey } from "./history";
 import { loadHistoryActivity, type HistoryActivity } from "./historyActivity";
 import { saveDocumentTypes } from "./documentTypes";
+import { classifyBatch } from "./classification";
 import { newUploadItems, uploadBatch, type UploadItem } from "./uploads";
 
 export default function App({ config, userName, onLogout }: { config: ClientConfig; userName?: string; onLogout?: () => Promise<void> }) {
@@ -191,13 +192,18 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     const controller = new AbortController(); mutation.current = controller;
     updateUploads(items);
     try {
-      await uploadBatch(client, caseId, items, updateUploads, document => {
+      const onDocument = (document: import("./contracts").DocumentResource) => {
         if (!mounted.current || idsRef.current.case_id !== caseId) return;
         polling.current?.abort(); setPollState(null);
         const documents = [...resourceRef.current.documents.filter(d => d.document_id !== document.document_id), document];
         changeIds({ ...emptyIds(), case_id: caseId, document_ids: documents.map(d => d.document_id) });
         commit({ ...emptyResources(), caseResource: resourceRef.current.caseResource, documents }); adoptText("");
-      }, controller.signal);
+      };
+      const uploadedItems = await uploadBatch(client, caseId, items, updateUploads, onDocument, controller.signal);
+      if (config.classifyDocuments && !controller.signal.aborted) {
+        setBusy("Classifying document contents");
+        await classifyBatch(client, caseId, uploadedItems, updateUploads, onDocument, controller.signal);
+      }
       if (!controller.signal.aborted) await refreshCase(controller.signal);
     } catch (err) { if (!controller.signal.aborted) setError(err instanceof Error ? err : new Error(String(err))); }
     finally { busyRef.current = false; if (mounted.current) setBusy(null); }
@@ -210,12 +216,13 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     const controller = new AbortController(); mutation.current = controller;
     try {
       await saveDocumentTypes(client, resourceRef.current.documents, typeDrafts, value => {
+        updateUploads(uploadRef.current.map(item => item.document?.document_id === value.document_id ? { ...item, document: value, classificationStatus: "ready", classificationError: undefined } : item));
         const documents = resourceRef.current.documents.map(d => d.document_id === value.document_id ? value : d);
         setTypeDrafts(previous => { const next = { ...previous }; delete next[value.document_id]; return next; });
         polling.current?.abort(); setPollState(null);
         changeIds({ ...emptyIds(), case_id: value.case_id, document_ids: documents.map(d => d.document_id) });
         commit({ ...emptyResources(), caseResource: resourceRef.current.caseResource, documents }); adoptText("");
-      }, controller.signal);
+      }, controller.signal, new Set(uploadRef.current.filter(item => item.classificationStatus === "needs_review" && item.document).map(item => item.document!.document_id)));
       await refreshCase(controller.signal);
     } catch (err) {
       if (!controller.signal.aborted) {
@@ -244,9 +251,9 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     } catch (err) { setError(err instanceof Error ? err : new Error(String(err))); if (err instanceof RequestError && err.body.code === "VERSION_CONFLICT") await loadHistory(); }
     finally { busyRef.current = false; if (mounted.current) setBusy(null); }
   }
-  const hasTypeChanges = resources.documents.some(d => typeDrafts[d.document_id] && typeDrafts[d.document_id] !== d.document_type);
+  const hasTypeChanges = resources.documents.some(d => typeDrafts[d.document_id] && (typeDrafts[d.document_id] !== d.document_type || uploadItems.some(item => item.document?.document_id === d.document_id && item.classificationStatus === "needs_review")));
   const finding = resources.findings.find(f => f.finding_id === ids.selected_finding_id);
-  return <WorkspaceView userName={userName} onLogout={onLogout ? () => {
+  return <WorkspaceView autoClassify={config.classifyDocuments} userName={userName} onLogout={onLogout ? () => {
     if ((dirtyRef.current || Object.keys(typeDrafts).some(id => resourceRef.current.documents.some(d => d.document_id === id && d.document_type !== typeDrafts[id])) || uploadRef.current.some(item => item.status === "unknown")) && !window.confirm("Sign out and leave unsaved work or unresolved upload retries?")) return;
     void onLogout().then(() => { try { window.sessionStorage.removeItem(storageKey); } catch { /* No resource content is stored. */ } }).catch(err => setError(err));
   } : undefined}
@@ -254,7 +261,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     historyPanel={historyOpen ? <CaseHistory cases={historyCases} activity={historyActivity} recentIds={recentIds} activeId={ids.case_id} loading={historyLoading} error={historyError} disabled={!!busy || restoring || !!conflict || !!transportRetry} onOpen={openCase} onDelete={value => void deleteHistoryCase(value)} onRefresh={() => void loadHistory()} onClose={() => setHistoryOpen(false)} /> : undefined}
     historyStorageWarning={historyStorageWarning} uploadItems={uploadItems}
     onRetryUploads={() => void runUploads(uploadRef.current)}
-    onClearUploads={() => { if (uploadRef.current.some(item => item.status === "unknown") && !window.confirm("Clear upload status and abandon pending transport retries? Uploaded server records will be kept.")) return; updateUploads([]); }}
+    onClearUploads={() => { if (uploadRef.current.some(item => item.status === "unknown" || item.classificationStatus === "unknown") && !window.confirm("Clear upload status and abandon pending transport retries? Uploaded server records will be kept.")) return; updateUploads([]); }}
     onDeleteDocument={documentId => {
       const document = resourceRef.current.documents.find(d => d.document_id === documentId);
       if (!document || !window.confirm(`Remove ${document.filename} from this case? The server will preserve its history and reject removal if it is protected by an active analysis or finalized review.`)) return;

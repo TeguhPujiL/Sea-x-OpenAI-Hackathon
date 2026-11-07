@@ -20,6 +20,16 @@ def environment():
     if not identity.exists(): identity.write_text(json.dumps({'actor_id':str(uuid4())}),encoding='utf-8')
     actor=json.loads(identity.read_text(encoding='utf-8'))['actor_id']
     env=os.environ.copy()
+    # Local operator opt-in is isolated from .env and the default P0 test config.
+    features_path=RUNTIME/'demo-features.json'
+    features=json.loads(features_path.read_text(encoding='utf-8')) if features_path.exists() else {}
+    classification=features.get('document_classification',False)
+    if not isinstance(classification,bool): raise ValueError('document_classification must be boolean')
+    env.setdefault('PROCUREMIND_DOCUMENT_CLASSIFICATION_ENABLED',str(classification).lower())
+    env.setdefault('VITE_DOCUMENT_CLASSIFICATION_ENABLED',env['PROCUREMIND_DOCUMENT_CLASSIFICATION_ENABLED'])
+    p1=features.get('p1',False)
+    if not isinstance(p1,bool): raise ValueError('p1 must be boolean')
+    env.setdefault('PROCUREMIND_P1_ENABLED',str(p1).lower())
     env.setdefault('PROCUREMIND_DATABASE_URL','sqlite:///'+(RUNTIME/'demo.db').as_posix())
     env.setdefault('PROCUREMIND_STORAGE_ROOT',str(RUNTIME/'pdfs'))
     env.setdefault('PROCUREMIND_DEMO_MODE','true')

@@ -6,15 +6,15 @@ export class RequestError extends Error {
 export class TransportError extends Error {
   constructor() { super("The response could not be received. The server outcome may be unknown. Retry the same request, or refresh before starting a new operation."); this.name = "TransportError"; }
 }
-export interface ClientConfig { baseUrl: string; development: boolean }
-export function readConfig(env: { VITE_API_BASE_URL?: string; DEV?: boolean }): ClientConfig {
+export interface ClientConfig { baseUrl: string; development: boolean; classifyDocuments?: boolean }
+export function readConfig(env: { VITE_API_BASE_URL?: string; VITE_DOCUMENT_CLASSIFICATION_ENABLED?: string; DEV?: boolean }): ClientConfig {
   // Development fallback only. Production must explicitly supply VITE_API_BASE_URL.
   const value = env.VITE_API_BASE_URL?.trim() || (env.DEV ? "/api/v1" : "");
   if (!value) throw new Error("VITE_API_BASE_URL is required for production builds. Set it to your deployed /api/v1 endpoint.");
   const url = value.replace(/\/+$/, "");
   if (!/^\/(?!\/)[^?#]*$/.test(url) && !/^https?:\/\/[^\s?#]+$/.test(url)) throw new Error("VITE_API_BASE_URL must be a same-origin path or an HTTP(S) URL without query parameters.");
   if (/^https?:/.test(url) && (new URL(url).username || new URL(url).password)) throw new Error("Do not put credentials in VITE_API_BASE_URL.");
-  return { baseUrl: url, development: !!env.DEV };
+  return { baseUrl: url, development: !!env.DEV, classifyDocuments: env.VITE_DOCUMENT_CLASSIFICATION_ENABLED === "true" };
 }
 export function normalize(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(normalize).join(",")}]`;
@@ -22,7 +22,7 @@ export function normalize(value: unknown): string {
   const result = JSON.stringify(value); if (result === undefined) throw new ShapeError("Undefined request values are not allowed."); return result;
 }
 export function requiresIdempotency(method: string, path: string): boolean {
-  return method === "POST" && (/^\/cases$/.test(path) || /^\/cases\/[^/]+\/(documents|analyses|simulations|reviews)$/.test(path) || /^\/findings\/[^/]+\/repair-proposals$/.test(path));
+  return method === "POST" && (/^\/documents\/[^/]+\/classifications$/.test(path) || /^\/cases$/.test(path) || /^\/cases\/[^/]+\/(documents|analyses|simulations|reviews)$/.test(path) || /^\/findings\/[^/]+\/repair-proposals$/.test(path));
 }
 export interface PreparedRequest<T> { method: string; path: string; idempotencyKey?: string; send(signal?: AbortSignal): Promise<T> }
 type Fetch = typeof fetch;

@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.response import ApiError
+from app.core.config import Settings
 from app.main import create_app
 from app.schemas import shared
 from app.services.assurance.schemas import ReviewCreate
@@ -73,7 +74,7 @@ def test_approve_case_is_rejected_with_valid_repair_and_envelope(qa):
 def test_appendix_b_error_envelopes_remain_stable(entry):
     # Fault injection verifies HTTP serialization/catalog stability. This does
     # not represent a live provider, upload or extraction integration test.
-    app = create_app()
+    app = create_app(Settings(database_url="sqlite:///:memory:"))
     @app.get("/test-injected-error")
     def injected():
         raise ApiError(entry["http_status"], entry["code"], "Synthetic contract fault",

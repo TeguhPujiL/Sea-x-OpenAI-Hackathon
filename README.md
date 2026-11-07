@@ -80,3 +80,13 @@ Prompt A/B backend is merged from teguh 22569a3. Run the explicit `python -m app
 ## Run the public demo
 
 See [PUBLIC_DEMO.md](docs/PUBLIC_DEMO.md) for the same-origin UI/FastAPI entrypoint, dedicated demo bootstrap and GitHub Codespaces configuration.
+
+## Local Docker deployment
+
+The integrated local app now includes login, case history, multi-PDF upload,
+post-upload document typing, and soft removal from the document list.
+Run `docker compose up -d --build`, then open http://localhost:18000.
+Configure the username/password in the ignored root `.env` first.
+SQLite, uploaded PDFs, and the backend actor identity persist in a named volume.
+See [local Docker testing and storage](docs/LOCAL_DOCKER.md) for setup, restart,
+persistence, deletion behavior and limitations.

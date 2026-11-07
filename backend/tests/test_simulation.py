@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from app.api.routes.simulations import get_simulation_access
 from app.main import create_app
+from app.core.config import Settings
 from app.schemas.shared import Envelope
 from app.services.simulation.engine import (
     ENGINE_VERSION, SimulationError, SupplierCatalog, canonical_json, evaluate, interpret,
@@ -238,7 +239,7 @@ def test_missing_simulation_and_unconfigured_integration(api):
     missing = client.get(f"/api/v1/simulations/{uuid4()}")
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "RESOURCE_NOT_FOUND"
-    app = create_app()
+    app = create_app(Settings(database_url="sqlite:///:memory:"))
     with TestClient(app) as unconfigured:
         assert unconfigured.post(f"/api/v1/cases/{CASE_ID}/simulations", json=payload()).status_code == 401
         response = unconfigured.get(f"/api/v1/cases/{CASE_ID}/simulations", headers={"X-Actor-Id": str(uuid4())})

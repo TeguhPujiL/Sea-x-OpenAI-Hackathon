@@ -25,6 +25,8 @@ export function fixtureBackend() {
     const fail = (status, code, message, retryable = false, details = []) => Response.json(errorEnvelope(code, message, retryable, details), { status });
     const required = method === "POST" && (path === "/cases" || /\/(documents|analyses|simulations|repair-proposals|reviews)$/.test(path));
     if (required && !key) return fail(400, "VALIDATION_ERROR", "Missing idempotency key");
+    if (method === "GET" && path === "/auth/session") return ok({ authenticated: true, username: "fixture-user", login_enabled: false });
+    if (method === "GET" && path === "/cases") return ok(page(state.caseResource ? [state.caseResource] : []));
     if (method === "GET" && path === "/health") return ok({ status: "ok", demo_mode: true });
     if (method === "POST" && path === "/cases") { state.caseResource = { ...caseResource(), ...body }; return ok(state.caseResource, 201); }
     if (method === "GET" && path === `/cases/${IDs.case}`) return state.caseResource ? ok(state.caseResource) : fail(404, "RESOURCE_NOT_FOUND", "No test case");
@@ -34,6 +36,9 @@ export function fixtureBackend() {
       const doc = documentResource(body.get("document_type")); state.documents.push(doc); return ok(doc, 201);
     }
     if (method === "GET" && path.endsWith("/documents")) return ok(page(state.documents));
+    if (method === "GET" && path.startsWith("/cases/") && path.endsWith("/challenges")) return ok(page(state.challenge ? [state.challenge] : []));
+    if (method === "GET" && path.startsWith("/cases/") && path.endsWith("/simulations")) return ok(page(state.simulation ? [state.simulation] : []));
+    if (method === "GET" && path.startsWith("/findings/") && path.endsWith("/repair-proposals")) return ok(page(state.repair ? [state.repair] : []));
     if (method === "GET" && path.endsWith("/jobs")) return ok(page(state.job ? [state.job] : []));
     if (method === "POST" && (path.endsWith("/analyses") || path.endsWith("/retries"))) { state.job = jobResource("QUEUED"); state.polls = 0; state.caseResource.case_status = "UNDER_ASSESSMENT"; return ok(state.job, 202); }
     if (method === "GET" && path.startsWith("/jobs/")) {

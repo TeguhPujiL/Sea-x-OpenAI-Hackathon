@@ -65,9 +65,10 @@ export interface ReviewResource {
   review_id: string; case_id: string; repair_proposal_id: string; decision: ReviewDecision; decision_reason: string;
   review_status: "COMPLETED"; reviewer: Actor; assurance_status_after: CaseResource["assurance_status"]; created_at: string;
 }
+export interface AuditActor { actor_id: string; display_name: string | null; role: string | null }
 export interface AuditResource {
-  event_id: string; case_id: string; event_type: string; actor: Actor; resource: { type: string; id: string; version: number };
-  occurred_at: string; request_id: string; details: Record<string, unknown>; previous_hash: string | null; event_hash: string;
+  event_id: string; case_id: string; event_type: string; actor: AuditActor; resource: { type: string; id: string; version: number };
+  occurred_at: string; request_id: string; details: Record<string, unknown>; previous_hash: string | null; event_hash: string | null;
 }
 export interface Page<T> { items: T[]; pagination: { limit: number; offset: number; total: number } }
 export interface CaseInput { title: string; category: string; description: string; quantity: number; budget_ceiling_idr: number; currency: "IDR" }
@@ -96,6 +97,8 @@ const statuses = ["QUEUED", "PROCESSING", "COMPLETED", "FAILED", "NEEDS_REVIEW"]
 const evidenceStatuses = ["VERIFIED", "UNVERIFIED", "CONFLICTING", "INSUFFICIENT"];
 const assurance = oneOf(["ACTION_REQUIRED", "READY_FOR_REVIEW", "REVIEW_COMPLETED"]);
 const actor = recordCheck({ actor_id: uuid, display_name: text, role: text });
+// Historical audit snapshots may omit names/roles; review identities remain strict.
+const auditActor = recordCheck({ actor_id: uuid, display_name: nullable(text), role: nullable(text) });
 const metric = (signed: boolean): Check => recordCheck({ eligible_supplier_count: v => Number.isSafeInteger(v) && (signed || (v as number) >= 0), lowest_total_offer_idr: v => Number.isSafeInteger(v) && (signed || (v as number) >= 0) });
 function decode<T>(name: string, checks: Record<string, Check>, extra?: (v: Record<string, unknown>) => boolean): Decoder<T> {
   return value => {
@@ -119,7 +122,7 @@ export const decodeChallenge = decode<ChallengeResource>("challenge", { ...versi
 export const decodeSimulation = decode<SimulationResource>("simulation", { ...resource, simulation_id: uuid, finding_id: uuid, engine_version: text, input_snapshot: recordCheck({ quantity: v => integer(v, 1), baseline: recordCheck({ minimum_ram_gb: v => integer(v, 1) }), alternative: recordCheck({ minimum_ram_gb: v => integer(v, 1) }), suppliers: array(recordCheck({ supplier_ref: text, ram_gb: v => integer(v, 1), unit_price_idr: v => integer(v) })) }), result: recordCheck({ baseline: metric(false), alternative: metric(false), delta: metric(true) }), interpretation: text }, v => v.supplier_data_version === undefined || typeof v.supplier_data_version === "string");
 export const decodeRepair = decode<RepairResource>("repair", { ...versioned, repair_proposal_id: uuid, finding_id: uuid, status: oneOf(["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "WITHDRAWN"]), action_type: oneOf(repairActions), before_text: text, proposed_text: text, justification: text, simulation_id: uuid, ai_execution_id: uuid, human_edits: bool });
 export const decodeReview = decode<ReviewResource>("review", { ...resource, review_id: uuid, repair_proposal_id: uuid, decision: oneOf(reviewDecisions), decision_reason: text, review_status: oneOf(["COMPLETED"]), reviewer: actor, assurance_status_after: assurance });
-export const decodeAudit = decode<AuditResource>("audit", { ...{ case_id: uuid }, event_id: uuid, event_type: text, actor, resource: recordCheck({ type: text, id: uuid, version }), occurred_at: utc, request_id: text, details: v => typeof v === "object" && v !== null && !Array.isArray(v), previous_hash: nullable(text), event_hash: text });
+export const decodeAudit = decode<AuditResource>("audit", { ...{ case_id: uuid }, event_id: uuid, event_type: text, actor: auditActor, resource: recordCheck({ type: text, id: uuid, version }), occurred_at: utc, request_id: text, details: v => typeof v === "object" && v !== null && !Array.isArray(v), previous_hash: nullable(text), event_hash: nullable(text) });
 export function pageDecoder<T>(item: Decoder<T>): Decoder<Page<T>> {
   return value => { const v = object(value); if (!Array.isArray(v.items) || !recordCheck({ limit: version, offset: v => integer(v), total: v => integer(v) })(v.pagination)) throw new ShapeError("Invalid paginated response."); return { items: v.items.map(item), pagination: v.pagination as Page<T>["pagination"] }; };
 }
@@ -130,3 +133,5 @@ export function decodeEnvelope<T>(value: unknown, dataDecoder: Decoder<T>): ApiE
   if (v.data !== null || !recordCheck({ code: text, message: text, details: array(recordCheck({ field: text, reason: text })), retryable: bool })(v.error)) throw new ShapeError("Invalid canonical API error.");
   return value as ApiEnvelope<T>;
 }
+
+export const decodeDocumentDeleted = decode<{ document_id: string; deleted_at: string }>("deleted_document", { document_id: uuid, deleted_at: utc });

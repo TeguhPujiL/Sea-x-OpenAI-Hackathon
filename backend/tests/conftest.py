@@ -15,10 +15,10 @@ from app.models import (
 )
 from app.models.base import now
 from app.services.assurance.access import get_case_grants
-from app.services.assurance.migrate import migrate
+from app.core.demo_bootstrap import bootstrap
 
 
-def seed_chain(session, *, suffix="1", clean=False):
+def seed_chain(session, *, suffix="1", clean=False, blocker=None):
     def save(row):
         session.add(row)
         session.flush()
@@ -32,7 +32,7 @@ def seed_chain(session, *, suffix="1", clean=False):
     for doc in docs:
         save(DocumentPage(document_id=doc.id, page_number=1, normalized_text="Synthetic exact requirement excerpt."))
     job = save(AnalysisJob(case_id=case.id, analysis_types=["CONTRADICTION_DETECTION"],
-        processing_status="COMPLETED", progress_percent=100, result_json={"finding_ids": []}))
+        processing_status="PROCESSING", progress_percent=50, result_json=None))
     execution = save(AiExecution(case_id=case.id, job_id=job.id, provider="synthetic-test-fixture",
         model="not-a-live-model", operation="TEST_ONLY", prompt_version="test-v1",
         input_document_ids_json=[str(d.id) for d in docs], schema_valid=True,
@@ -43,10 +43,12 @@ def seed_chain(session, *, suffix="1", clean=False):
     if not clean:
         finding = save(Finding(case_id=case.id, analysis_job_id=job.id, ai_execution_id=execution.id,
             type="REQUIREMENT_CONTRADICTION", severity="HIGH", title="Synthetic contradiction",
-            summary="Fixture only", confidence=1.0, evidence_status="VERIFIED"))
+            summary="Fixture only", confidence=1.0, evidence_status=(blocker.upper()
+                if blocker in {"unverified", "conflicting", "insufficient"} else "VERIFIED")))
         for doc in docs:
             save(EvidenceRef(finding_id=finding.id, document_id=doc.id, page_number=1,
-                excerpt="Synthetic exact requirement excerpt.", verification_status="VERIFIED"))
+                excerpt=("Not present on source page" if blocker == "bad_excerpt"
+                         else "Synthetic exact requirement excerpt."), verification_status="VERIFIED"))
         challenge = save(Challenge(case_id=case.id, finding_id=finding.id, status="READY",
             question="Synthetic human-reviewed question?", risk_rationale="Fixture only",
             requested_evidence_json=[], human_edits=True))
@@ -64,23 +66,28 @@ def seed_chain(session, *, suffix="1", clean=False):
         repair.status = "SUBMITTED"
         repair.version = 2
         session.flush()
-        job.result_json = {"finding_ids": [str(finding.id)]}
         chain.finding, chain.challenge, chain.simulation, chain.repair = finding, challenge, simulation, repair
+    # Negative test scenarios are assembled before terminal execution freezes.
+    # A FAILED job is the valid persisted representation of an unusable result.
+    job.result_json = None if blocker == "unusable_job" else {"finding_ids": [] if clean else [str(chain.finding.id)]}
+    job.warnings_json = [{"code": "EVIDENCE_EXCERPT_NOT_FOUND"}] if blocker == "job_warning" else []
+    job.processing_status = "FAILED" if blocker == "unusable_job" else "NEEDS_REVIEW" if blocker == "job_warning" else "COMPLETED"
+    job.progress_percent = 100
     session.commit()
     return chain
 
 
 @pytest.fixture
-def qa(tmp_path):
+def qa(tmp_path, request):
     url = "sqlite:///" + (tmp_path / "qa.db").as_posix()
     engine = build_engine(url)
-    migrate(engine)
+    bootstrap(engine)
     actor_id = uuid4()
     settings = Settings(database_url=url, demo_mode=True, demo_actor_id=actor_id,
         demo_display_name="Synthetic QA Reviewer", demo_role="REVIEWER",
         demo_scopes=frozenset({"review:decide", "review:read", "audit:read"}))
     with Session(engine, expire_on_commit=False) as session:
-        chain = seed_chain(session)
+        chain = seed_chain(session, blocker=getattr(request, "param", None))
     grants = {actor_id: frozenset({chain.case.id})}
     def make_app():
         app = create_app(settings)

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createClient, RequestError, TransportError, readConfig, normalize, requiresIdempotency } from "../src/api.ts";
-import { decodeCase, decodeDocument, decodeJob, decodeFinding, decodeChallenge, decodeSimulation, decodeRepair, decodeReview, decodeEnvelope, ShapeError, uuid } from "../src/contracts.ts";
+import { decodeCase, decodeDocument, decodeJob, decodeFinding, decodeChallenge, decodeSimulation, decodeRepair, decodeReview, decodeAudit, decodeEnvelope, ShapeError, uuid } from "../src/contracts.ts";
 import { emptyIds, emptyResources, saveIds, readIds, storageKey, hasRequiredDocuments, pollJob, cleanCase, canReview, recoveredStep } from "../src/workflow.ts";
 import { loadWorkspace, listAll } from "../src/resources.ts";
 import { WorkspaceView, ErrorPanel } from "../src/WorkspaceView.tsx";
@@ -211,4 +211,45 @@ test("complete synthetic contract journey, stale repair, and authoritative refre
   assert.ok(requests.every(v => !v.body || v.body instanceof FormData || !Object.hasOwn(v.body, "reviewer_actor_id")));
   const simulationRequest = requests.find(v => v.method === "POST" && v.path.endsWith("/simulations")); assert.deepEqual(Object.keys(simulationRequest.body).sort(), ["alternative", "baseline", "finding_id", "supplier_data_version"]);
   assert.equal(requests.find(v => v.method === "POST" && v.path.endsWith("/challenges")).key, null);
+});
+
+
+test("audit refresh accepts null hashes returned by the backend after clean analysis", async () => {
+  const event = { ...auditResource(), event_type: "ANALYSIS_COMPLETED", resource: { type: "job", id: IDs.job, version: 1 }, details: { finding_count: 0 }, event_hash: null, previous_hash: null };
+  const client = createClient(config, async () => Response.json(envelope(page([event]))));
+  const events = await listAll(client, `/cases/${IDs.case}/audit`, decodeAudit);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].event_hash, null);
+  const resources = { ...emptyResources(), caseResource: caseResource(), job: jobResource("COMPLETED", true), audit: events };
+  const html = view({ resources, step: 5 });
+  assert.match(html, /Clean-case completion pending contract decision/);
+  assert.match(html, /analysis completed/i);
+  assert.match(html, /Not recorded/);
+  assert.doesNotMatch(html, /Unable to continue/);
+});
+test("audit accepts unknown legacy actor names without weakening reviewer validation", () => {
+  const event = { ...auditResource(), actor: { actor_id: IDs.actor, display_name: null, role: null }, event_hash: null };
+  assert.equal(decodeAudit(event).actor.actor_id, IDs.actor);
+  const resources = { ...fullResources(), audit: [event] };
+  assert.match(view({ resources, step: 5 }), /Actor name not recorded/);
+  assert.throws(() => decodeReview({ ...reviewResource(), reviewer: event.actor }), ShapeError);
+});
+test("audit rejects invalid hash values and missing fields", () => {
+  for (const field of ["event_hash", "previous_hash"]) {
+    for (const value of [42, true, {}, [], undefined]) {
+      assert.throws(() => decodeAudit({ ...auditResource(), [field]: value }), ShapeError);
+    }
+  }
+  assert.equal(decodeAudit(auditResource()).event_hash, "test-only-event-hash");
+});
+
+
+test("uploaded documents expose removal while active analysis disables it", () => {
+  const resources = fullResources();
+  const html = view({ resources, ids: fullIds(), step: 0 });
+  assert.match(html, /Remove document/);
+  assert.match(html, /aria-label="Remove test-tor.pdf"/);
+  resources.job = jobResource("PROCESSING");
+  const busy = view({ resources, ids: fullIds(), step: 0 });
+  assert.match(busy, /disabled=""[^>]*aria-label="Remove test-tor.pdf"/);
 });

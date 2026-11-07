@@ -1,6 +1,6 @@
 # ProcureMind V4.1 contract lock
 
-Status: **SOURCE VERIFIED / OPEN GAPS RECORDED**. This is a documentation lock, not implementation or release approval. All 39 pages of API Contract & Integration Specification v1.1 (normalized implementation edition), dated 7 November 2026, were read. Section 2.3 controls earlier drafts. Paths, wire names, enum values and codes below are transcribed from the primary contract; unresolved conflicts remain in CONTRACT_GAPS.md.
+Status: **SOURCE VERIFIED / OPEN GAPS RECORDED**. The shared foundation is implemented; business endpoints remain router skeletons. This lock is not release approval. All 39 pages of API Contract & Integration Specification v1.1 (normalized implementation edition), dated 7 November 2026, were read. Section 2.3 controls earlier drafts. Paths, wire names, enum values and codes below are transcribed from the primary contract; unresolved conflicts remain in CONTRACT_GAPS.md.
 
 ## Source identity
 
@@ -217,4 +217,4 @@ AI_SCHEMA_VALIDATION_FAILED and EVIDENCE_EXCERPT_NOT_FOUND also appear in Sectio
 
 [OWNERSHIP.md](OWNERSHIP.md) defines the user-assigned team boundaries. Shared models/schemas require Teguh review. [CONTRACT_GAPS.md](CONTRACT_GAPS.md) records all unresolved decisions and labels proposed corrections. [VERIFICATION.md](VERIFICATION.md) separates source-transcription checks from unexecuted foundation/runtime checks.
 
-No teammate-owned feature or runtime application is implemented by this documentation task. Changes to routes, enums, envelopes, state transitions, evidence or decision semantics require a versioned approved revision and synchronized OpenAPI update (page 39).
+The shared runtime foundation and persistence declarations are implemented. No business endpoint or teammate-owned feature is implemented. docs/openapi.foundation.json describes only the health endpoint; the 36-route contract inventory is not an implementation claim. Changes to routes, enums, envelopes, state transitions, evidence or decision semantics require a versioned approved revision and synchronized OpenAPI update (page 39).

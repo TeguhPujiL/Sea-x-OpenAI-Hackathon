@@ -69,7 +69,7 @@ Status: **OPEN / PROPOSED FOUNDATION EXCEPTION**.
 
 User/playbook require GET /api/v1/health and GET /openapi.json, but Section 6's 36-endpoint inventory specifies neither. Section 2.3 says every JSON response uses the envelope; FastAPI's native OpenAPI document is itself JSON.
 
-PROPOSED: define a minimal health data schema and status, and explicitly permit native OpenAPI output outside the application envelope. Do not claim this exception is already in v1.1. No runtime is implemented by this documentation task.
+PROPOSED: define a minimal health data schema and status, and explicitly permit native OpenAPI output outside the application envelope. Do not claim this exception is already in v1.1. Foundation currently implements PROPOSED health data {status: "ok", demo_mode: boolean} with the canonical envelope and serves native OpenAPI outside /api/v1. These support the user-required foundation checks but remain explicitly provisional contract exceptions, not silent amendments.
 
 ## G09 - Operational policy details
 
@@ -79,11 +79,19 @@ Not fully specified: upload byte/page limits, list defaults/maxima, idempotency 
 
 PROPOSED: document concrete operational policies with Teguh/owners, escalating any changed wire semantics to a versioned revision.
 
-## G10 - Runtime implementation absent
+## G10 - Foundation implementation
 
-Status: **OPEN / IMPLEMENTATION DEPENDENCY**.
+Status: **FOUNDATION IMPLEMENTED / FEATURE INTEGRATION PENDING**.
 
-Code was deleted at user request. This task recreates contract documentation only. No backend, frontend, manifest or tests exist; all foundation runtime checks remain NOT RUN. Previous test outcomes apply to deleted versions and cannot establish current readiness.
+The shared FastAPI/SQLite/schema/model infrastructure and React/Vite/TypeScript/Tailwind shell are implemented and verified. The 36 business routes remain empty router ownership boundaries. No PDF/AI service, simulator, review/audit service, business transaction, seed or product flow is pre-implemented. Production OIDC, case authorization, transactional idempotency, optimistic-concurrency commands, durable jobs and migrations remain owner integration work.
+
+The empty demo database initializer is explicit and never runs on application startup. It is not a migration runner. JSON contents and cross-resource case consistency require service validation. Shared SQLite guards forbid updates/deletes for AI executions, simulations, reviews and audit events; they do not implement their business workflows.
+
+## G11 - PROPOSED foundation operational defaults
+
+Status: **OPEN / PROPOSED IMPLEMENTATION DECISIONS**.
+
+A missing/blank Idempotency-Key is mapped by the shared dependency to 400 VALIDATION_ERROR; no new error code is invented. Missing production identity fails closed with 401 until OIDC is implemented. Framework errors not enumerated by Appendix B retain their HTTP status with a provisional VALIDATION_ERROR/INTERNAL_ERROR code. Client correlation IDs are accepted only as printable ASCII up to 128 characters; otherwise the backend generates a req_ identifier. These policies are explicitly PROPOSED, subject to owner review.
 
 ## Editorial notes
 

@@ -76,3 +76,7 @@ The foundation is ready for owner handoff; it is not the completed P0 workflow o
 ## Teguh backend merge
 
 Prompt A/B backend is merged from teguh 22569a3. Run the explicit `python -m app.core.migrations` upgrade before serving. See [decision handoff](docs/TEGUH_DECISION_HANDOFF.md) and [phase-A handoff](docs/TEGUH_P0_HANDOFF.md). Existing frontend and Simulation/Review/Audit modules are retained. The backend model default remains gpt-6.1-sol as configured on dev.
+
+## Run the public demo
+
+See [PUBLIC_DEMO.md](docs/PUBLIC_DEMO.md) for the same-origin UI/FastAPI entrypoint, dedicated demo bootstrap and GitHub Codespaces configuration.

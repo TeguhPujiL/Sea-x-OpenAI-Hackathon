@@ -17,6 +17,8 @@ def migrate(engine):
     if engine.dialect.name != "sqlite":
         raise RuntimeError("This migration is for SQLite only")
     with engine.connect() as connection:
+        legacy_alter = connection.exec_driver_sql("PRAGMA legacy_alter_table").scalar()
+        connection.exec_driver_sql("PRAGMA legacy_alter_table=ON")
         connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
         connection.commit()
         try:
@@ -34,8 +36,11 @@ def migrate(engine):
                     names = [c["name"] for c in columns if c["name"] in AiExecution.__table__.columns]
                     quoted = ", ".join('"'+n+'"' for n in names)
                     connection.exec_driver_sql(f"INSERT INTO ai_executions_p0_migration ({quoted}) SELECT {quoted} FROM ai_executions")
+                    original_triggers = connection.exec_driver_sql("SELECT sql FROM sqlite_master WHERE type='trigger' AND tbl_name='ai_executions' AND sql IS NOT NULL").scalars().all()
                     connection.exec_driver_sql("DROP TABLE ai_executions")
                     connection.exec_driver_sql("ALTER TABLE ai_executions_p0_migration RENAME TO ai_executions")
+                    for trigger_sql in original_triggers:
+                        connection.exec_driver_sql(trigger_sql)
                 elif "requested_model" not in {c["name"] for c in columns}:
                     connection.exec_driver_sql("ALTER TABLE ai_executions ADD COLUMN requested_model VARCHAR")
             if "analysis_jobs" in tables:
@@ -62,6 +67,7 @@ def migrate(engine):
             connection.rollback()
             raise
         finally:
+            connection.exec_driver_sql("PRAGMA legacy_alter_table=" + str(int(bool(legacy_alter))))
             connection.exec_driver_sql("PRAGMA foreign_keys=ON")
             connection.commit()
 

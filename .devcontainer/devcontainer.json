@@ -1,0 +1,9 @@
+{
+  "name": "ProcureMind dev demo",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "forwardPorts": [8000],
+  "portsAttributes": {"8000": {"label": "ProcureMind UI + API", "onAutoForward": "notify", "protocol": "http"}},
+  "postCreateCommand": "python3 scripts/demo_runtime.py setup",
+  "postStartCommand": "python3 scripts/demo_runtime.py start",
+  "waitFor": "postCreateCommand"
+}

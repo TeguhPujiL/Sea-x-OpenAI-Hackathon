@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     demo_role: str = "ANALYST"
     demo_scopes: frozenset[str] = frozenset()
     openai_api_key: SecretStr | None = None
-    openai_model: str | None = None
+    openai_model: str = "gpt-6.1-sol"
 
     @model_validator(mode="after")
     def validate_demo(self):

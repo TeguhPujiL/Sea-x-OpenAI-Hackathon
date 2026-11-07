@@ -236,7 +236,16 @@ progress::-moz-progress-bar { background: #237c70; }
 .history-controls { display: flex; align-items: end; gap: 16px; flex-wrap: wrap; margin: 20px 0 12px; }
 .history-controls .field { flex: 1; min-width: 200px; }
 .history-list { list-style: none; margin: 14px 0 0; padding: 0; max-height: 380px; overflow: auto; }
-.history-list li { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); padding: 16px 0; }
+.history-list > li { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); padding: 16px 0; }
+.history-list > li > div { min-width: 0; }
+.history-list > li > div:first-child { flex: 1; overflow-wrap: anywhere; }
+.history-activity { flex: 1; font-size: 12px; }
+.history-activity time { display: block; color: var(--muted); font-size: 12px; }
+.history-steps { padding-left: 20px; }
+.history-steps > li { padding: 8px 0; }
+.history-steps > li > span { display: block; color: var(--muted); }
+.history-steps ul { padding-left: 16px; }
+.history-steps ul li { padding: 5px 0; }
 .history-list strong { font-size: 14px; }
 .history-list code { display: block; color: var(--muted); }
 .document-type-editor { display: flex; align-items: end; gap: 12px; margin: 16px 0 8px; }
@@ -255,7 +264,7 @@ progress::-moz-progress-bar { background: #237c70; }
 .login-card form { display: grid; gap: 20px; margin: 26px 0; }
 @media (max-width: 640px) {
   .case-history { padding: 18px; }
-  .history-list li { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .history-list > li { align-items: flex-start; flex-direction: column; gap: 10px; }
   .document-type-editor { align-items: stretch; flex-direction: column; }
   .login-card { padding: 26px; }
 }

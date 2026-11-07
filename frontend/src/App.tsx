@@ -6,6 +6,7 @@ import { emptyIds, emptyResources, readIds, saveIds, cleanCase, terminal, recove
 import { WorkspaceView } from "./WorkspaceView";
 import { CaseHistory } from "./CaseHistory";
 import { readCaseHistory, rememberCase, caseHistoryKey } from "./history";
+import { loadHistoryActivity, type HistoryActivity } from "./historyActivity";
 import { saveDocumentTypes } from "./documentTypes";
 import { newUploadItems, uploadBatch, type UploadItem } from "./uploads";
 
@@ -13,6 +14,8 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
   const [typeDrafts, setTypeDrafts] = useState<Record<string, DocumentType>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyCases, setHistoryCases] = useState<CaseResource[]>([]);
+  const [historyActivity, setHistoryActivity] = useState<HistoryActivity>({});
+  const historyRequest = useRef(0);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [recentIds, setRecentIds] = useState<string[]>(() => { try { return readCaseHistory(window.localStorage); } catch { return []; } });
@@ -153,10 +156,15 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     } catch (err) { if (mounted.current && idsRef.current.case_id === caseId) setError(err instanceof Error ? err : new Error(String(err))); }
   }
   async function loadHistory() {
+    const request = ++historyRequest.current;
     setHistoryOpen(true); setHistoryLoading(true); setHistoryError(null);
-    try { const values = await listAll(client, "/cases", decodeCase); if (mounted.current) setHistoryCases(values); }
-    catch (err) { if (mounted.current) setHistoryError(err instanceof Error ? err.message : "Could not load cases"); }
-    finally { if (mounted.current) setHistoryLoading(false); }
+    try {
+      const values = await listAll(client, "/cases", decodeCase);
+      const activity = await loadHistoryActivity(client, values);
+      if (mounted.current && request === historyRequest.current) { setHistoryCases(values); setHistoryActivity(activity); }
+    }
+    catch (err) { if (mounted.current && request === historyRequest.current) setHistoryError(err instanceof Error ? err.message : "Could not load cases"); }
+    finally { if (mounted.current && request === historyRequest.current) setHistoryLoading(false); }
   }
   function openCase(caseId: string) {
     if (!uuid(caseId.trim())) { setError(new Error("Enter a valid UUID v4 case ID.")); return; }
@@ -243,7 +251,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     void onLogout().then(() => { try { window.sessionStorage.removeItem(storageKey); } catch { /* No resource content is stored. */ } }).catch(err => setError(err));
   } : undefined}
     onHistory={() => historyOpen ? setHistoryOpen(false) : void loadHistory()}
-    historyPanel={historyOpen ? <CaseHistory cases={historyCases} recentIds={recentIds} activeId={ids.case_id} loading={historyLoading} error={historyError} disabled={!!busy || restoring || !!conflict || !!transportRetry} onOpen={openCase} onDelete={value => void deleteHistoryCase(value)} onRefresh={() => void loadHistory()} onClose={() => setHistoryOpen(false)} /> : undefined}
+    historyPanel={historyOpen ? <CaseHistory cases={historyCases} activity={historyActivity} recentIds={recentIds} activeId={ids.case_id} loading={historyLoading} error={historyError} disabled={!!busy || restoring || !!conflict || !!transportRetry} onOpen={openCase} onDelete={value => void deleteHistoryCase(value)} onRefresh={() => void loadHistory()} onClose={() => setHistoryOpen(false)} /> : undefined}
     historyStorageWarning={historyStorageWarning} uploadItems={uploadItems}
     onRetryUploads={() => void runUploads(uploadRef.current)}
     onClearUploads={() => { if (uploadRef.current.some(item => item.status === "unknown") && !window.confirm("Clear upload status and abandon pending transport retries? Uploaded server records will be kept.")) return; updateUploads([]); }}

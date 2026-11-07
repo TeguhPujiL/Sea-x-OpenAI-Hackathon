@@ -153,6 +153,25 @@ test("NEEDS_REVIEW warnings and FAILED retryable are displayed separately from s
   assert.match(view({ resources, ids: fullIds(), step: 1 }), /EVIDENCE_EXCERPT_NOT_FOUND/);
   resources.job = jobResource("FAILED"); const html = view({ resources, ids: fullIds(), step: 1 }); assert.match(html, /AI_PROVIDER_TIMEOUT/); assert.match(html, /Retryable: true/);
 });
+
+test("provider failures with a null runtime model remain readable and retryable", () => {
+  const job = { ...jobResource("FAILED"), ai_execution: { ...jobResource().ai_execution,
+    model: null, schema_valid: false, evidence_validation_passed: false,
+    evidence_checks: { checked: 0, passed: 0, failed: 0 }, usage: null } };
+  assert.deepEqual(decodeJob(job), job);
+  const html = view({ resources: { ...fullResources(), job }, ids: fullIds(), step: 1 });
+  assert.match(html, /AI_PROVIDER_TIMEOUT/);
+  assert.match(html, /Not returned by provider/);
+  assert.match(html, /Retryable: true/);
+  assert.doesNotMatch(html, /synthetic-test-model|does not match API Contract/);
+});
+
+test("execution model still rejects missing or malformed values", () => {
+  for (const model of [undefined, 123, false, {}, []]) {
+    const job = jobResource(); job.ai_execution.model = model;
+    assert.throws(() => decodeJob(job), /job.ai_execution/);
+  }
+});
 test("storage allowlist excludes case versions, step, contents, and reviewer identity", () => {
   const storage = memoryStorage(); saveIds(storage, { ...fullIds(), current_step: 5, case_version: 99, api_key: "sensitive", reviewer: reviewResource().reviewer, proposed_text: "confidential" });
   const raw = storage.getItem(storageKey); assert.deepEqual(Object.keys(JSON.parse(raw)).sort(), Object.keys(emptyIds()).sort());

@@ -168,3 +168,31 @@ existing DELETE /cases/{id} request (reason, expected_version). Success removes
 that case from the visible history and local recent IDs, and clears the workspace
 if it was active. No new backend route or shared schema is introduced. Server
 scope/access checks, active-analysis/review protections and soft deletion apply.
+
+
+## Assure summary from existing records
+
+Assure now starts with a read-only summary of the loaded analysis and human review:
+analysis state, server-returned requirement/finding counts, supplier quotation
+coverage, finding links with page-addressable evidence, processing warnings, and
+the selected correction's reviewer conclusion verbatim. The projection is in
+assuranceSummaryData.ts and rendered by AssuranceSummary.tsx.
+
+Proposal rows come only from active case documents typed SUPPLIER_QUOTATION.
+Membership in ai_execution.input_document_ids establishes analysis coverage;
+uploading a proposal later does not make it assessed. Only findings referenced by
+the current job and reviews matching its selected repair are included. Missing
+findings, failed checks, warnings and NEEDS_REVIEW prevent a clean conclusion.
+Missing counts stay unavailable, rather than becoming zero.
+
+No additional AI call, new API field, review decision or persistence table is
+introduced. Refresh and history reopening rebuild the summary from authorized
+server records. The existing result does not contain per-requirement vendor
+compliance verdicts; the UI states this limitation and never interprets no findings
+or APPROVE_DRAFT as vendor compliance. Human conclusions remain attributed to
+the recorded reviewer. The G01 clean-case completion gap remains visible.
+
+Executed frontend verification: 63 Node tests passed, including clean/failed/
+processing/NEEDS_REVIEW, unassessed quotations, source evidence, missing counts,
+cross-case/history filtering and reviewer decision attribution. Typecheck and
+production build passed. No new live AI evaluation was performed.

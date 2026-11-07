@@ -147,3 +147,28 @@ POST analysis (202), poll to COMPLETED with schema_valid=true and
 evidence_validation_passed=true using gpt-6.1-sol, then soft-delete only the
 synthetic test case and verify it no longer appears in case history. This was an
 explicit live check, separate from the mocked automated test suite.
+
+
+## Read the Assure summary
+
+After analysis, open **Assure** to see the summary above the review controls.
+Classify vendor proposals as **Supplier quotation** in Upload and save the types.
+The table shows which proposals were inputs to the recorded analysis and links
+any recorded findings to their evidence. A later upload requires a new analysis
+before it appears as included. The selected correction's saved reviewer decision
+and exact conclusion appear when a review exists. Reopen the case from history
+or refresh resources to reload recorded results.
+
+This summary uses the existing analysis/review; it makes no extra AI request.
+The current analysis provides extracted requirements and integrity findings, not
+a compliance verdict for every vendor requirement. A no-finding result therefore
+remains distinct from vendor approval. Failed/incomplete processing, warnings,
+and missing evidence stay visible. Existing clean-case completion restrictions
+are preserved.
+
+
+The summary update passed 63 frontend tests, TypeScript typecheck and production
+build. The Docker image was rebuilt and became healthy. Authenticated HTTP checks
+verified the new assets and case access, and the existing synthetic persistence
+check verified retained document metadata/hash, deletion state, audit and logout.
+Interactive visual browser verification was not performed.

@@ -318,3 +318,13 @@ test("document types save together at the footer and unsaved choices block Asses
   assert.match(html, /Save document types<\/button><button[^>]*disabled=""[^>]*>Continue to Assess/);
   assert.match(view(base), /disabled=""[^>]*>Save document types/);
 });
+
+
+test("Assure includes the recorded summary above the human review and preserves the clean-case gap", () => {
+  const resources = { ...emptyResources(), caseResource: caseResource(), job: jobResource("COMPLETED", true) };
+  const html = view({ resources, step: 5 });
+  assert.match(html, /Assurance summary/);
+  assert.match(html, /Vendor requirement compliance: not determined/);
+  assert.match(html, /Clean-case completion pending contract decision/);
+  assert.doesNotMatch(view({ resources, step: 0 }), /id="assurance-summary-title"/);
+});

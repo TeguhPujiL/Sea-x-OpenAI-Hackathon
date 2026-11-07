@@ -261,3 +261,22 @@ progress::-moz-progress-bar { background: #237c70; }
 }
 
 .delete-document { color: #a03f2b; display: block; margin: 8px 0; }
+
+
+.assurance-summary { border: 1px solid #cddfdb; border-radius: 10px; background: #f7faf9; padding: 24px; margin: 0 0 28px; }
+.assurance-summary .section-title { flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+.assurance-summary h4 { font-size: 15px; margin: 18px 0 8px; }
+.assurance-summary h5 { font-size: 14px; margin: 0 0 8px; }
+.assurance-summary p, .assurance-summary li { font-size: 13px; line-height: 1.7; }
+.summary-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+.summary-facts > div { border: 1px solid #dce7e4; border-radius: 7px; padding: 14px; background: #fff; }
+.summary-facts dt { font-size: 11px; color: var(--muted); margin-bottom: 7px; }
+.summary-facts dd { margin: 0; font-size: 16px; font-weight: 600; }
+.summary-scope { padding: 14px 0; border-top: 1px solid #dce7e4; margin-top: 14px; }
+.summary-review { background: #fff; border-left: 3px solid #307f70; padding: 4px 18px 18px; margin: 16px 0; }
+.summary-review blockquote { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; font-size: 14px; line-height: 1.8; }
+.summary-findings > article { padding: 16px 0; border-top: 1px solid #dce7e4; scroll-margin-top: 20px; }
+.assurance-summary .metrics-table caption { text-align: left; font-size: 12px; padding: 10px 0; }
+.assurance-summary .metrics-table td, .assurance-summary .metrics-table th { overflow-wrap: anywhere; }
+.summary-source { margin-top: 16px; color: var(--muted); font-size: 12px; }
+@media (max-width: 640px) { .assurance-summary { padding: 18px; } .summary-facts { grid-template-columns: 1fr; } }

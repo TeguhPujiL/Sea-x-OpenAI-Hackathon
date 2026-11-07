@@ -1,4 +1,5 @@
 import { uuid, type CaseResource } from "./contracts";
+import { latestActivity, type HistoryActivity } from "./historyActivity";
 export const caseHistoryKey = "procuremind.case-history.ids.v1";
 type HistoryStorage = Pick<Storage, "getItem" | "setItem">;
 export function readCaseHistory(storage: HistoryStorage): string[] {
@@ -23,13 +24,14 @@ export function orderCases(cases: CaseResource[], recentIds: string[]): CaseReso
 export const caseHistoryPageSize = 5;
 export function caseHistoryPage(cases: CaseResource[], recentIds: string[], options: {
   query: string; category: string; recentOnly: boolean; page: number;
-}) {
+}, activity: HistoryActivity = {}) {
   const query = options.query.trim().toLowerCase();
   const filtered = cases.filter(c => !c.deleted_at
     && (!options.category || c.category === options.category)
     && (!options.recentOnly || recentIds.includes(c.case_id))
     && `${c.title} ${c.case_number} ${c.case_id}`.toLowerCase().includes(query))
-    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.case_id.localeCompare(a.case_id));
+    .sort((a, b) => Date.parse(latestActivity(b, activity[b.case_id])) - Date.parse(latestActivity(a, activity[a.case_id]))
+      || Date.parse(b.created_at) - Date.parse(a.created_at) || b.case_id.localeCompare(a.case_id));
   const pages = Math.max(1, Math.ceil(filtered.length / caseHistoryPageSize));
   const page = Math.min(pages, Math.max(1, options.page));
   return { items: filtered.slice((page - 1) * caseHistoryPageSize, page * caseHistoryPageSize),

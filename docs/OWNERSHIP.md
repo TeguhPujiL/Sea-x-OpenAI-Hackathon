@@ -2,7 +2,7 @@
 
 | Owner | Owned scope |
 | --- | --- |
-| Frontend Lead | frontend/src/** |
+| A Zaqi | frontend/src/** |
 | Teguh | Core; shared contract; case/document/analysis/finding/challenge/repair; services/ai/**; services/documents/**; integration and merge |
 | Aris | services/simulation/**; simulation router; fixtures; simulation tests |
 | Fazhima | services/assurance/**; review/audit routers; persistence and contract regression tests |

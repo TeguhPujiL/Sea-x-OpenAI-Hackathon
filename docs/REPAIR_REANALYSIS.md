@@ -1,0 +1,23 @@
+# Revised evidence in Repair
+
+Repair now includes a revised-PDF upload and evidence-selection panel grouped by vendor. Every PDF is a new document through the existing contracted document upload route. Original bytes, earlier analysis results, findings, simulations, submitted repair snapshots and review history remain unchanged.
+
+Each vendor has its own revised-PDF upload form, current documentation finding count/traffic-light indicator, and open-point checklist with recorded challenge questions and cited source passages. Shared points repeat under every affected vendor, but the same finding ID represents one review acknowledgement across all groups. Show/hide controls support each group and all groups together. Other case points remain visible when no vendor association is available.
+
+An optional shared-case upload section covers TOR/specification or other cross-vendor revisions. Upload descriptions include the selected vendor label or shared-case context. Files are not silently renamed and descriptions are not treated as authoritative vendor ownership. Users should preserve recognizable vendor filename labels for quotations and warranty files so later Assess grouping remains consistent.
+
+The reviewer supplies a meaningful revision description, uploads one or more PDFs and assigns their document types. New uploads start as Other. A revised TOR or technical specification must have its type saved before replacing that document in the selected evidence set.
+
+The selection starts from the current analysis execution's authoritative input document IDs. Newly observed usable uploads are selected automatically, while explicit deselections stay deselected. A user must choose which old versions to exclude: a similar filename or description is not authority to supersede a document. A new analysis resets the panel to that new execution's actual input set.
+
+The complete document inventory, selection checkboxes and type editors are available at the bottom in a closed Current documents and evidence selection panel. The selected count and Analyze selected revised evidence action remain outside that collapsed section. Classification and explicit evidence selection are preserved; moving the inventory does not create an automatic supersession rule.
+
+Open finding points appear as an evidence-review checklist. Checking a point acknowledges that its evidence needs were reviewed for re-analysis; it does not resolve that finding. Before re-analysis, the selected set must include a usable TOR and technical specification, contain only current accessible nondeleted completed documents, have no unsaved type changes, and have every open point reviewed. A new document must be selected, or the user must explicitly acknowledge that all needed evidence is already in the selected set. The latter allows a deliberate new analysis when the correct evidence already exists without forcing fake uploads.
+
+The new analysis uses the existing POST case analyses contract with selected document IDs, requirement extraction and contradiction detection. Its accepted job becomes the active assessment and is polled normally; execution status, warnings and findings come from the server. A clean result cannot silently complete a case under G01. Old findings are not marked RESOLVED merely because a later analysis returns a different finding list.
+
+`RepairEvidence` takes `resources`, `disabled`, `onUpload(files, description)` and `onReanalyze(documentIds)`. Optional document-type draft/save callbacks and `uploadItems` allow the parent workspace to display classification controls and real upload progress. The parent owns API requests, captured idempotency keys, retry behavior, job polling and preservation of draft context during uploads. The helper `validateEvidenceSet` validates the selected IDs before an analysis request; UI-only acknowledgements are not public API fields or backend state transitions.
+
+No shared model, schema, new endpoint, public PDF URL, document replacement operation or approval decision is added. An immutable, authorized supersession relationship would need a separately approved shared-contract design; this implementation retains explicit evidence-set selection instead.
+
+Regression coverage: selection recovery/new uploads, preserving deselections, case/job changes, foreign/deleted/failed/page-less documents, duplicate/missing input IDs, required document types, point acknowledgement, deliberate reuse of existing evidence, pending type changes, active-analysis blocking, vendor-specific upload context, repeated shared findings, group finding-count scores, collapsed bottom inventory and UI wording that avoids claiming resolution.

@@ -322,3 +322,34 @@ progress::-moz-progress-bar { background: #237c70; }
 @media (max-width: 640px) { .vendor-proposal-result { padding: 16px; } .vendor-proposal-result .split { flex-direction: column; } }
 
 .history-updated time { font-weight: 600; color: #3e605c; }
+.documentation-risk { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid; border-radius: 6px; font-size: 11px; font-weight: 600; line-height: 1.5; }
+.risk-light { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.risk-green { color: #145a35; background: #e1f1e6; border-color: #99c4a6; }
+.risk-yellow { color: #6e4d00; background: #fff3c9; border-color: #d5bc71; }
+.risk-red { color: #8b2925; background: #fce9e6; border-color: #d5a19b; }
+.risk-reasons, .risk-legend { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.shared-point-label { display: inline-block; background: #edf0fa; color: #3f4b7b; padding: 4px 7px; border-radius: 4px; font-size: 11px; }
+.repeated-shared-points { border-left: 3px solid #adb7d1; padding-left: 14px; margin: 18px 0; }
+.vendor-group-heading { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.vendor-group-heading > h4 { margin: 0; font-size: 17px; }
+.vendor-group-heading > button { margin-left: auto; }
+.vendor-collapsible > div[hidden] { display: none; }
+.vendor-visibility { margin: 16px 0; }
+.vendor-challenges form, .vendor-simulations form { margin: 18px 0; }
+.repair-evidence { border: 1px solid var(--line); border-radius: 9px; padding: 20px; margin: 24px 0; }
+.repair-evidence > p, .repair-evidence p, .repair-evidence li { font-size: 12px; }
+.repair-evidence fieldset { margin: 16px 0; }
+.repair-evidence .checkbox { align-items: flex-start; margin: 10px 0; }
+.repair-evidence input[type="file"] { max-width: 100%; }
+.vendor-decision-summary { margin: 24px 0; }
+.vendor-scenario-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 14px 0; }
+.vendor-scenario-grid > .field { min-width: 0; }
+.vendor-scenario-grid input { width: 100%; min-width: 0; box-sizing: border-box; }
+@media (max-width: 640px) { .vendor-scenario-grid { grid-template-columns: minmax(0, 1fr); } }
+.ram-calculation { margin: 18px 0; border: 1px solid var(--line); border-radius: 7px; padding: 14px; }
+.finding-scenario-panel { margin: 16px 0; }
+.finding-scenario-result { border: 1px solid #c5d8d1; border-radius: 8px; padding: 16px; margin: 14px 0; background: #f8fbfa; }
+.finding-scenario-result h6 { font-size: 12px; margin: 16px 0 8px; }
+.finding-scenario-result p, .finding-scenario-result li { font-size: 12px; overflow-wrap: anywhere; }
+.scenario-alternative, .scenario-check { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
+.finding-scenario-panel .field textarea { width: 100%; min-width: 0; }

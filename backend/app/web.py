@@ -1,5 +1,6 @@
 """Same-origin demo composition. Owners retain calculation/decision logic."""
 import json
+import os
 from pathlib import Path
 from fastapi import Depends, Request
 from fastapi.staticfiles import StaticFiles
@@ -26,6 +27,13 @@ class AssuranceAuditAdapter:
 def create_web_app(settings=None, static_directory=None, login_settings=None):
     config=settings or get_settings()
     app=create_app(config,audit_service=AssuranceAuditAdapter())
+    # Explicit local prototype extension; the locked v1.1 contract is unchanged.
+    # The feature's separate SQLite migration must be invoked before opt-in.
+    if os.environ.get("PROCUREMIND_FINDING_SCENARIOS_ENABLED", "").lower() in {"1", "true", "yes"}:
+        if not config.demo_mode:
+            raise RuntimeError("Experimental finding scenarios require the explicit demo composition")
+        from app.services.assurance.finding_scenarios.router import router as finding_scenarios_router
+        app.include_router(finding_scenarios_router, prefix="/api/v1/experimental")
 
     def persisted_grants(request: Request, actor=Depends(get_actor)):
         with request.app.state.session_factory() as session:

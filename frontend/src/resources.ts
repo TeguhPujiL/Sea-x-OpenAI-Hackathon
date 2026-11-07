@@ -36,7 +36,12 @@ export async function loadWorkspace(client: ApiClient, ids: Identifiers, signal?
   if (repair && simulation && repair.simulation_id !== simulation.simulation_id) throw new ShapeError("The repair references a different simulation. Reconcile before reviewing.");
   const reviews = repair ? (await listAll(client, `/cases/${caseId}/reviews`, decodeReview, signal)).map(v => belongs(v, caseId)) : [];
   const audit = repair ? (await listAll(client, `/cases/${caseId}/audit`, decodeAudit, signal)).map(v => belongs(v, caseId)) : [];
-  return { caseResource, documents, job, findings, challenge, simulation, repair, reviews, audit };
+  const [challengeHistory, simulationHistory] = findings.length ? await Promise.all([
+    listAll(client, `/cases/${caseId}/challenges`, decodeChallenge, signal),
+    listAll(client, `/cases/${caseId}/simulations`, decodeSimulation, signal),
+  ]) : [[], []];
+  for (const item of [...challengeHistory, ...simulationHistory]) belongs(item, caseId);
+  return { caseResource, documents, job, findings, challenge, simulation, repair, reviews, audit, challengeHistory, simulationHistory };
 }
 
 // Recover downstream identifiers from authorized server lists when a case is
@@ -48,8 +53,8 @@ export async function restoreCaseResources(client: ApiClient, ids: Identifiers, 
   const caseId = ids.case_id;
   const newest = <T extends { created_at: string }>(items: T[]): T | undefined => [...items].sort((a,b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
   const [challenges, simulations, repairs] = await Promise.all([
-    listAll(client, `/cases/${caseId}/challenges`, decodeChallenge, signal),
-    listAll(client, `/cases/${caseId}/simulations`, decodeSimulation, signal),
+    Promise.resolve(base.challengeHistory ?? []),
+    Promise.resolve(base.simulationHistory ?? []),
     listAll(client, `/findings/${finding.finding_id}/repair-proposals`, decodeRepair, signal),
   ]);
   for (const item of [...challenges, ...simulations, ...repairs]) belongs(item, caseId);

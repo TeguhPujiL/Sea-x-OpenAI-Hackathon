@@ -11,6 +11,18 @@ export function documentPackage(document: DocumentResource): string {
   return document.filename.match(/^(Positive|Negative)__/i)?.[1].toLowerCase() ?? "uploaded";
 }
 export const activeConcern = (finding: FindingResource) => ["OPEN", "UNDER_REVIEW"].includes(finding.status);
+export interface DocumentationRisk { color: "green" | "yellow" | "red"; score: number | null; label: string; reasons: string[] }
+export function documentationRisk(ready: boolean, assessed: boolean, documents: DocumentResource[], findings: FindingResource[]): DocumentationRisk {
+  if (!assessed) return { color: "yellow", score: null, label: "Not yet scored", reasons: ["Wait for a usable assessment."] };
+  const count = new Set(findings.filter(activeConcern).map(f => f.finding_id)).size;
+  const gaps = !ready || documents.some(d => d.processing_status !== "COMPLETED");
+  const reasons = [...(count ? [`${count} distinct open finding(s), including applicable shared points.`] : []),
+    ...(gaps ? ["Document, requirement or evidence coverage needs confirmation."] : [])];
+  if (count >= 3) return { color: "red", score: count, label: "Multiple documentation findings", reasons };
+  if (count >= 1) return { color: "yellow", score: count, label: count === 1 ? "One documentation finding" : "Two documentation findings", reasons };
+  if (gaps) return { color: "yellow", score: null, label: "Document coverage incomplete", reasons };
+  return { color: "green", score: 0, label: "No open documentation findings", reasons: ["Analyzed quotation and warranty coverage; no open linked or shared finding."] };
+}
 
 export function vendorAssessment(resources: Resources) {
   const summary = assuranceSummary(resources);
@@ -57,13 +69,28 @@ export function vendorAssessment(resources: Resources) {
       const warrantyPresent = relatedDocuments.some(d => d.document_type === "WARRANTY_EVIDENCE");
       const analyzedDocuments = relatedDocuments.filter(d => inputIds.has(d.document_id)).length;
       const openFindings = relatedFindings.filter(activeConcern);
+      const packageShared = sharedFindings.filter(f => f.evidence.some(ref => {
+        const document = byId.get(ref.document_id);
+        return !document || documentPackage(document) === "uploaded" || documentPackage(document) === source;
+      }) || !f.evidence.length);
+      const challengePoints = [...new Map([...relatedFindings, ...packageShared].filter(activeConcern).map(f => [f.finding_id, f])).values()];
       const candidate = evidenceReliable && baselineIncluded && ready("SUPPLIER_QUOTATION") && ready("WARRANTY_EVIDENCE") && !openFindings.length;
       const status = !job || !job.result ? "Assessment pending" : !evidenceReliable ? "Evidence review required"
         : openFindings.length ? "Clarification available" : !ready("SUPPLIER_QUOTATION") || !ready("WARRANTY_EVIDENCE")
         ? "Document coverage incomplete" : !baselineIncluded ? "Requirement coverage incomplete" : "Candidate for detailed evaluation";
-      return { source, documents: relatedDocuments, findings: relatedFindings, openFindings, candidate, status,
+      const coverageReady = evidenceReliable && baselineIncluded && ready("SUPPLIER_QUOTATION") && ready("WARRANTY_EVIDENCE");
+      const risk = documentationRisk(coverageReady,
+        !!job?.result && ["COMPLETED", "NEEDS_REVIEW"].includes(job.status), relatedDocuments.filter(d => inputIds.has(d.document_id)),
+        challengePoints.map(f => f.evidence.length && f.evidence.every(validCitation) ? f : { ...f, evidence_status: "UNVERIFIED" }));
+      const inAnalysis = relatedDocuments.some(d => d.document_type === "SUPPLIER_QUOTATION" && inputIds.has(d.document_id));
+      return { source, documents: relatedDocuments, findings: relatedFindings, sharedFindings: packageShared, challengePoints, inAnalysis, coverageReady, risk, openFindings, candidate, status,
         quotationPresent, warrantyPresent, analyzedDocuments };
-    }) }));
+    }) })).map(vendor => {
+      const included = vendor.packages.filter(p => p.inAnalysis);
+      return { ...vendor, risk: documentationRisk(included.length > 0 && included.every(p => p.coverageReady),
+        included.length > 0 && !!job?.result && ["COMPLETED", "NEEDS_REVIEW"].includes(job.status),
+        included.flatMap(p => p.documents.filter(d => inputIds.has(d.document_id))), included.flatMap(p => p.challengePoints)) };
+    });
   const canChallenge = (finding: FindingResource) => findings.some(f => f.finding_id === finding.finding_id)
     && finding.case_id === caseResource?.case_id && finding.analysis_job_id === job?.job_id
     && activeConcern(finding) && finding.evidence_status === "VERIFIED"

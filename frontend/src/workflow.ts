@@ -1,4 +1,5 @@
 import { uuid, type CaseResource, type DocumentResource, type JobResource, type FindingResource, type ChallengeResource, type SimulationResource, type RepairResource, type ReviewResource, type AuditResource } from "./contracts";
+import type { FindingScenario } from "./findingScenarios";
 export const steps = ["Upload", "Assess", "Challenge", "Simulate", "Repair", "Assure"] as const;
 export interface Identifiers {
   case_id: string | null; document_ids: string[]; analysis_job_id: string | null; selected_finding_id: string | null;
@@ -9,6 +10,8 @@ export interface Resources {
   caseResource: CaseResource | null; documents: DocumentResource[]; job: JobResource | null;
   findings: FindingResource[]; challenge: ChallengeResource | null; simulation: SimulationResource | null;
   repair: RepairResource | null; reviews: ReviewResource[]; audit: AuditResource[];
+  challengeHistory?: ChallengeResource[]; simulationHistory?: SimulationResource[];
+  findingScenarioHistory?: FindingScenario[];
 }
 export const emptyResources = (): Resources => ({ caseResource: null, documents: [], job: null, findings: [], challenge: null, simulation: null, repair: null, reviews: [], audit: [] });
 export const storageKey = "procuremind.workspace.ids.v1";
@@ -39,7 +42,8 @@ export function hasRequiredDocuments(documents: DocumentResource[]): boolean {
   return ["TOR", "TECHNICAL_SPECIFICATION"].every(type => documents.some(d => d.document_type === type && !d.deleted_at && d.processing_status !== "FAILED" && d.page_count > 0));
 }
 export function canReview(resources: Resources): boolean {
-  return !cleanCase(resources.job) && resources.repair?.status === "SUBMITTED" && resources.reviews.length === 0 && !!resources.caseResource;
+  return !cleanCase(resources.job) && resources.repair?.status === "SUBMITTED"
+    && !resources.reviews.some(review => review.repair_proposal_id === resources.repair?.repair_proposal_id) && !!resources.caseResource;
 }
 export function recoveredStep(r: Resources): number {
   if (r.reviews.length || r.repair?.status === "SUBMITTED") return 5;

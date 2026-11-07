@@ -9,6 +9,11 @@ import { readCaseHistory, rememberCase, caseHistoryKey } from "./history";
 import { loadHistoryActivity, type HistoryActivity } from "./historyActivity";
 import { saveDocumentTypes } from "./documentTypes";
 import { newUploadItems, uploadBatch, type UploadItem } from "./uploads";
+import { vendorWorkflow, prepareVendorSimulationBatch, type SimulationParameters } from "./vendorWorkflowData";
+import { vendorAssessment } from "./vendorAssessmentData";
+import { comparisonData } from "./VendorDecisionSummary";
+import { validateEvidenceSet } from "./repairEvidenceData";
+import { loadFindingScenarios, prepareFindingScenarioBatch } from "./findingScenarios";
 
 export default function App({ config, userName, onLogout }: { config: ClientConfig; userName?: string; onLogout?: () => Promise<void> }) {
   const [typeDrafts, setTypeDrafts] = useState<Record<string, DocumentType>>({});
@@ -22,10 +27,20 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
   const [historyStorageWarning, setHistoryStorageWarning] = useState(false);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const uploadRef = useRef<UploadItem[]>([]);
+  const uploadMode = useRef<"initial" | "revision">("initial");
   const client = useMemo(() => createClient(config), [config]);
   const [ids, setIds] = useState<Identifiers>(() => { try { return readIds(window.sessionStorage); } catch { return emptyIds(); } });
   const idsRef = useRef(ids);
   const [resources, setResources] = useState<Resources>(emptyResources);
+  const [scenarioAvailability, setScenarioAvailability] = useState<"loading" | "ready" | "disabled" | "error">("disabled");
+  const [scenarioLoadError, setScenarioLoadError] = useState<string | null>(null);
+  const [vendorPreference, setVendorPreference] = useState<{ scope: string; id: string | null }>({ scope: "", id: null });
+  const preferenceScope = resources.caseResource && resources.job ? `${resources.caseResource.case_id}.${resources.job.job_id}` : "";
+  useEffect(() => {
+    let id: string | null = null;
+    try { id = preferenceScope ? window.sessionStorage.getItem(`procuremind.vendor-preference.${preferenceScope}`) : null; } catch { /* Preference remains optional. */ }
+    setVendorPreference({ scope: preferenceScope, id: id && /^[A-Z0-9]{1,40}$/.test(id) ? id : null });
+  }, [preferenceScope]);
   const resourceRef = useRef(resources);
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
@@ -50,7 +65,33 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     idsRef.current = next; setIds(next);
     try { setStorageWarning(!saveIds(window.sessionStorage, next)); } catch { setStorageWarning(true); }
   }, []);
-  const commit = useCallback((next: Resources) => { resourceRef.current = next; setResources(next); }, []);
+  const commit = useCallback((next: Resources) => {
+    const current = resourceRef.current;
+    if (next.findingScenarioHistory === undefined && next.caseResource?.case_id === current.caseResource?.case_id && next.job?.job_id === current.job?.job_id) {
+      next = { ...next, findingScenarioHistory: current.findingScenarioHistory };
+    }
+    resourceRef.current = next; setResources(next);
+  }, []);
+  const refreshFindingScenarios = useCallback(async (signal?: AbortSignal) => {
+    const snapshot = resourceRef.current, caseId = snapshot.caseResource?.case_id, jobId = snapshot.job?.job_id;
+    if (!caseId || !jobId || !snapshot.job?.result) { setScenarioAvailability("disabled"); return; }
+    setScenarioAvailability("loading"); setScenarioLoadError(null);
+    try {
+      const items = await loadFindingScenarios(client, caseId, signal);
+      if (!mounted.current || signal?.aborted || resourceRef.current.caseResource?.case_id !== caseId || resourceRef.current.job?.job_id !== jobId) return;
+      commit({ ...resourceRef.current, findingScenarioHistory: items.filter(item => item.analysis_job_id === jobId) });
+      setScenarioAvailability("ready");
+    } catch (error) {
+      if (!mounted.current || signal?.aborted || resourceRef.current.caseResource?.case_id !== caseId || resourceRef.current.job?.job_id !== jobId) return;
+      if (error instanceof RequestError && error.status === 404) setScenarioAvailability("disabled");
+      else { setScenarioAvailability("error"); setScenarioLoadError(error instanceof Error ? error.message : "Could not load finding scenarios"); }
+    }
+  }, [client, commit]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void refreshFindingScenarios(controller.signal);
+    return () => controller.abort();
+  }, [resources.caseResource?.case_id, resources.job?.job_id, resources.job?.status, refreshFindingScenarios]);
   useEffect(() => {
     const caseId = resources.caseResource?.case_id;
     setTypeDrafts({});
@@ -128,7 +169,11 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
       } catch (err) {
         if (!mounted.current || controller.signal.aborted) return;
         const actual = err instanceof Error ? err : new Error(String(err)); setError(actual);
-        if (actual instanceof TransportError && request && !received) { const sameRequest = request; setTransportRetry(() => () => { void attempt(sameRequest); }); }
+        if (actual instanceof TransportError && request && !received) {
+          if (request.method === "POST" && request.path.endsWith("/challenges") && !request.idempotencyKey) {
+            setError(new Error("The challenge response was interrupted and its outcome is unknown. Refresh resources to inspect saved challenge history before starting another generation."));
+          } else { const sameRequest = request; setTransportRetry(() => () => { void attempt(sameRequest); }); }
+        }
         if (actual instanceof RequestError && actual.status === 409 && actual.body.code === "VERSION_CONFLICT") {
           let refreshed = false; let refreshErrorMessage: string | undefined;
           try { const next = await loadWorkspace(client, idsRef.current, controller.signal, true); applyLoaded(next, idsRef.current, true); refreshed = true; }
@@ -142,7 +187,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
   async function refreshWorkspace() {
     if (busyRef.current || restoring) return;
     busyRef.current = true; setBusy("Refreshing resources"); setError(null); setTransportRetry(undefined);
-    try { const next = await refresh(true); if (step === 5) await readAssurance(); if (conflict) setConflict({ ...conflict, refreshed: true, refreshError: undefined }); if (next.job && !terminal(next.job.status) && polling.current?.signal.aborted) beginPolling(next.job.job_id); }
+    try { const next = await refresh(true); await refreshFindingScenarios(); if (step === 5) await readAssurance(); if (conflict) setConflict({ ...conflict, refreshed: true, refreshError: undefined }); if (next.job && !terminal(next.job.status) && polling.current?.signal.aborted) beginPolling(next.job.job_id); }
     catch (err) { setError(err instanceof Error ? err : new Error(String(err))); }
     finally { busyRef.current = false; setBusy(null); }
   }
@@ -182,11 +227,12 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
       else void readAssurance();
     });
   }
-  async function runUploads(items: UploadItem[]) {
+  async function runUploads(items: UploadItem[], revision = false) {
     const caseId = idsRef.current.case_id;
     if (!caseId || busyRef.current || restoring || conflict || transportRetry) return;
     if (resourceRef.current.job && !terminal(resourceRef.current.job.status)) { setError(new Error("Wait for the active analysis before uploading.")); return; }
-    if ((dirtyRef.current || resourceRef.current.job) && !window.confirm("Upload new documents and start a fresh assessment workspace? Existing analysis and review records remain on the server.")) return;
+    if (!revision && (dirtyRef.current || resourceRef.current.job) && !window.confirm("Upload new documents and start a fresh assessment workspace? Existing analysis and review records remain on the server.")) return;
+    uploadMode.current = revision ? "revision" : "initial";
     busyRef.current = true; setBusy("Uploading PDFs"); setError(null);
     const controller = new AbortController(); mutation.current = controller;
     updateUploads(items);
@@ -195,17 +241,22 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
         if (!mounted.current || idsRef.current.case_id !== caseId) return;
         polling.current?.abort(); setPollState(null);
         const documents = [...resourceRef.current.documents.filter(d => d.document_id !== document.document_id), document];
-        changeIds({ ...emptyIds(), case_id: caseId, document_ids: documents.map(d => d.document_id) });
-        commit({ ...emptyResources(), caseResource: resourceRef.current.caseResource, documents }); adoptText("");
+        if (revision) {
+          changeIds({ ...idsRef.current, document_ids: documents.map(d => d.document_id) });
+          commit({ ...resourceRef.current, documents });
+        } else {
+          changeIds({ ...emptyIds(), case_id: caseId, document_ids: documents.map(d => d.document_id) });
+          commit({ ...emptyResources(), caseResource: resourceRef.current.caseResource, documents }); adoptText("");
+        }
       }, controller.signal);
       if (!controller.signal.aborted) await refreshCase(controller.signal);
     } catch (err) { if (!controller.signal.aborted) setError(err instanceof Error ? err : new Error(String(err))); }
     finally { busyRef.current = false; if (mounted.current) setBusy(null); }
   }
-  async function saveTypes() {
+  async function saveTypes(preserveRevision = false) {
     if (busyRef.current || restoring || conflict || transportRetry) return;
     if (resourceRef.current.job && !terminal(resourceRef.current.job.status)) return;
-    if (dirtyRef.current && !window.confirm("Saving document types leaves the unsaved repair text. Continue?")) return;
+    if (!preserveRevision && dirtyRef.current && !window.confirm("Saving document types leaves the unsaved repair text. Continue?")) return;
     busyRef.current = true; setBusy("Saving document types"); setError(null);
     const controller = new AbortController(); mutation.current = controller;
     try {
@@ -213,8 +264,13 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
         const documents = resourceRef.current.documents.map(d => d.document_id === value.document_id ? value : d);
         setTypeDrafts(previous => { const next = { ...previous }; delete next[value.document_id]; return next; });
         polling.current?.abort(); setPollState(null);
-        changeIds({ ...emptyIds(), case_id: value.case_id, document_ids: documents.map(d => d.document_id) });
-        commit({ ...emptyResources(), caseResource: resourceRef.current.caseResource, documents }); adoptText("");
+        if (preserveRevision) {
+          changeIds({ ...idsRef.current, document_ids: documents.map(d => d.document_id) });
+          commit({ ...resourceRef.current, documents });
+        } else {
+          changeIds({ ...emptyIds(), case_id: value.case_id, document_ids: documents.map(d => d.document_id) });
+          commit({ ...emptyResources(), caseResource: resourceRef.current.caseResource, documents }); adoptText("");
+        }
       }, controller.signal);
       await refreshCase(controller.signal);
     } catch (err) {
@@ -255,6 +311,62 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     if (openChallenge) setStep(2);
   }
   const finding = resources.findings.find(f => f.finding_id === ids.selected_finding_id);
+  function generateVendorChallenge(id: string, requested: string[]) {
+    void execute("Generating vendor challenge", () => {
+      const target = resourceRef.current.findings.find(f => f.finding_id === id);
+      if (!target || !vendorAssessment(resourceRef.current).canChallenge(target) || !requested.length) throw new Error("Select an active verified finding and supporting evidence to request.");
+      return client.prepare("POST", `/cases/${idsRef.current.case_id}/challenges`, decodeChallenge,
+        { status: 201, body: { finding_id: id, generation_mode: "AI_ASSISTED", requested_evidence: requested } });
+    }, value => {
+      if (value.case_id !== idsRef.current.case_id || value.finding_id !== id) throw new ShapeError("Challenge references another case or finding.");
+      const current = resourceRef.current;
+      const challengeHistory = [...(current.challengeHistory ?? []).filter(c => c.challenge_id !== value.challenge_id), value];
+      if (idsRef.current.selected_finding_id === id) changeIds({ ...idsRef.current, challenge_id: value.challenge_id });
+      commit({ ...current, challengeHistory, challenge: idsRef.current.selected_finding_id === id ? value : current.challenge });
+    });
+  }
+  function simulateVendorPoints(findingIds: string[], parameters: SimulationParameters) {
+    void execute("Simulating vendor challenges", () => prepareVendorSimulationBatch(client, resourceRef.current, findingIds, parameters, (value, completed, total) => {
+      if (idsRef.current.case_id !== value.case_id) throw new ShapeError("Active case changed during simulation.");
+      const current = resourceRef.current;
+      commit({ ...current, simulationHistory: [...(current.simulationHistory ?? []).filter(s => s.simulation_id !== value.simulation_id), value] });
+      setBusy(`Simulating vendor challenges ${completed}/${total}`);
+    }), () => {});
+  }
+  function generateFindingScenarios(findingIds: string[], assumptions: string[]) {
+    void execute("Generating finding-based scenarios", () => prepareFindingScenarioBatch(client, resourceRef.current, findingIds, assumptions, (value, completed, total) => {
+      if (value.case_id !== idsRef.current.case_id || value.analysis_job_id !== resourceRef.current.job?.job_id) throw new ShapeError("Scenario context changed during generation.");
+      const current = resourceRef.current;
+      commit({ ...current, findingScenarioHistory: [...(current.findingScenarioHistory ?? []).filter(item => item.scenario_id !== value.scenario_id), value] });
+      setBusy(`Generating finding-based scenarios ${completed}/${total}`);
+    }), () => {});
+  }
+  function useVendorSimulation(simulationId: string) {
+    const current = resourceRef.current, workflow = vendorWorkflow(current);
+    const simulation = workflow.simulations.find(s => s.simulation_id === simulationId);
+    const target = current.findings.find(f => f.finding_id === simulation?.finding_id);
+    if (!simulation || !target || !workflow.assessment.canChallenge(target)) return;
+    if (dirtyRef.current && !window.confirm("Use this simulation and leave the unsaved repair text? Server history is retained.")) return;
+    const challenge = workflow.challenges.filter(c => c.finding_id === target.finding_id && c.status !== "CLOSED").sort((a,b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] ?? null;
+    changeIds({ ...idsRef.current, selected_finding_id: target.finding_id, challenge_id: challenge?.challenge_id ?? null,
+      simulation_id: simulation.simulation_id, repair_proposal_id: null });
+    commit({ ...current, challenge, simulation, repair: null, reviews: [], audit: [] }); adoptText(""); setStep(4);
+  }
+  function reanalyzeRevisions(documentIds: string[]) {
+    if (hasTypeChanges) { setError(new Error("Save document types before analysis.")); return; }
+    const selection = validateEvidenceSet(resources, documentIds);
+    if (!selection.ready) { setError(new Error(selection.errors.join(" "))); return; }
+    if (dirtyDraft && !window.confirm("Analyze revised evidence and leave unsaved repair text? Original records remain preserved.")) return;
+    const caseId = ids.case_id;
+    void execute("Analyzing revised evidence", () => client.prepare("POST", `/cases/${caseId}/analyses`, decodeJob,
+      { status: 202, body: { document_ids: documentIds, analysis_types: ["REQUIREMENT_EXTRACTION", "CONTRADICTION_DETECTION"], force_reanalysis: true } }), async (value, signal) => {
+        if (value.case_id !== caseId) throw new ShapeError("Analysis belongs to another case.");
+        polling.current?.abort();
+        changeIds({ ...emptyIds(), case_id: caseId, document_ids: resourceRef.current.documents.map(d => d.document_id), analysis_job_id: value.job_id });
+        commit({ ...emptyResources(), caseResource: resourceRef.current.caseResource, documents: resourceRef.current.documents, job: value });
+        adoptText(""); setStep(1); await refreshCase(signal); beginPolling(value.job_id);
+      });
+  }
   return <WorkspaceView userName={userName} onLogout={onLogout ? () => {
     if ((dirtyRef.current || Object.keys(typeDrafts).some(id => resourceRef.current.documents.some(d => d.document_id === id && d.document_type !== typeDrafts[id])) || uploadRef.current.some(item => item.status === "unknown")) && !window.confirm("Sign out and leave unsaved work or unresolved upload retries?")) return;
     void onLogout().then(() => { try { window.sessionStorage.removeItem(storageKey); } catch { /* No resource content is stored. */ } }).catch(err => setError(err));
@@ -262,7 +374,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     onHistory={() => historyOpen ? setHistoryOpen(false) : void loadHistory()}
     historyPanel={historyOpen ? <CaseHistory cases={historyCases} activity={historyActivity} recentIds={recentIds} activeId={ids.case_id} loading={historyLoading} error={historyError} disabled={!!busy || restoring || !!conflict || !!transportRetry} onOpen={openCase} onDelete={value => void deleteHistoryCase(value)} onRefresh={() => void loadHistory()} onClose={() => setHistoryOpen(false)} /> : undefined}
     historyStorageWarning={historyStorageWarning} uploadItems={uploadItems}
-    onRetryUploads={() => void runUploads(uploadRef.current)}
+    onRetryUploads={() => void runUploads(uploadRef.current, uploadMode.current === "revision")}
     onClearUploads={() => { if (uploadRef.current.some(item => item.status === "unknown") && !window.confirm("Clear upload status and abandon pending transport retries? Uploaded server records will be kept.")) return; updateUploads([]); }}
     onDeleteDocument={documentId => {
       const document = resourceRef.current.documents.find(d => d.document_id === documentId);
@@ -300,6 +412,16 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
       }, value => { changeIds({ ...emptyIds(), case_id: value.case_id }); commit({ ...emptyResources(), caseResource: value }); });
     }}
     onUpload={(files, description) => void runUploads(newUploadItems(files, description))}
+    onUploadRevision={(files, description) => void runUploads(newUploadItems(files, description), true)}
+    onReanalyzeRevisions={reanalyzeRevisions} onSaveRevisionDocumentTypes={() => void saveTypes(true)}
+    onGenerateVendorChallenge={generateVendorChallenge} onSimulateVendorPoints={simulateVendorPoints} onUseVendorSimulation={useVendorSimulation}
+    scenarioAvailability={scenarioAvailability} scenarioLoadError={scenarioLoadError} onGenerateFindingScenarios={generateFindingScenarios}
+    selectedVendorId={vendorPreference.scope === preferenceScope ? vendorPreference.id : null}
+    onSelectVendor={id => {
+      if (!preferenceScope || !comparisonData(resourceRef.current, null).vendors.some(v => v.id === id && v.selectable)) return;
+      setVendorPreference({ scope: preferenceScope, id });
+      try { window.sessionStorage.setItem(`procuremind.vendor-preference.${preferenceScope}`, id); } catch { setStorageWarning(true); }
+    }}
     onAnalyze={() => {
       if (hasTypeChanges) { setError(new Error("Save document types before analysis.")); return; }
       if (dirtyDraft && !window.confirm("Start a new analysis and leave the unsaved repair text? Existing server records remain immutable.")) return;
@@ -333,14 +455,16 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
       return client.prepare("POST", `/cases/${ids.case_id}/challenges`, decodeChallenge, { status: 201, body: { finding_id: finding.finding_id, generation_mode: "AI_ASSISTED", requested_evidence: requested } });
     }, value => {
       if (value.case_id !== ids.case_id || value.finding_id !== finding?.finding_id) throw new ShapeError("Challenge references another case or finding.");
-      changeIds({ ...idsRef.current, challenge_id: value.challenge_id }); commit({ ...resourceRef.current, challenge: value });
+      changeIds({ ...idsRef.current, challenge_id: value.challenge_id }); commit({ ...resourceRef.current, challenge: value,
+        challengeHistory: [...(resourceRef.current.challengeHistory ?? []).filter(c => c.challenge_id !== value.challenge_id), value] });
     })}
     onSimulate={(baseline, alternative, supplierVersion) => void execute("Running deterministic simulation", () => {
       if (!finding || !resources.challenge || !Number.isSafeInteger(baseline) || baseline < 1 || !Number.isSafeInteger(alternative) || alternative < 1 || !supplierVersion.trim()) throw new Error("Provide positive integer RAM thresholds, a supplier data version, and a challenged finding.");
       return client.prepare("POST", `/cases/${ids.case_id}/simulations`, decodeSimulation, { status: 201, body: { finding_id: finding.finding_id, baseline: { minimum_ram_gb: baseline }, alternative: { minimum_ram_gb: alternative }, supplier_data_version: supplierVersion.trim() } });
     }, value => {
       if (value.case_id !== ids.case_id || value.finding_id !== finding?.finding_id) throw new ShapeError("Simulation references another case or finding.");
-      changeIds({ ...idsRef.current, simulation_id: value.simulation_id, repair_proposal_id: null }); commit({ ...resourceRef.current, simulation: value, repair: null, reviews: [], audit: [] }); adoptText("");
+      changeIds({ ...idsRef.current, simulation_id: value.simulation_id, repair_proposal_id: null }); commit({ ...resourceRef.current, simulation: value, repair: null, reviews: [], audit: [],
+        simulationHistory: [...(resourceRef.current.simulationHistory ?? []).filter(s => s.simulation_id !== value.simulation_id), value] }); adoptText("");
     })}
     onGenerateRepair={action => void execute("Generating repair draft", () => {
       if (!finding || !resources.simulation || cleanCase(resources.job)) throw new Error("A real finding and recorded simulation are required.");

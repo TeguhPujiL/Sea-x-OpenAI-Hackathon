@@ -121,9 +121,10 @@ test("Challenge finding passes the original finding ID; clean options never fabr
     walk(node.props?.children);
   }
   walk(root);
-  assert.equal(buttons.length, 2);
-  assert.equal(buttons[0].props.disabled, false);
-  buttons[0].props.onClick();
+  assert.equal(buttons.length, 7); // One vendor concern plus the shared point in all six packages.
+  const ownPoint = buttons.find(button => button.props["aria-label"] === `Challenge finding: ${r.findings[0].title}`);
+  assert.equal(ownPoint.props.disabled, false);
+  ownPoint.props.onClick();
   assert.deepEqual(selected, [r.findings[0].finding_id]);
   r.findings = []; r.job.result.finding_ids = [];
   buttons.length = 0;

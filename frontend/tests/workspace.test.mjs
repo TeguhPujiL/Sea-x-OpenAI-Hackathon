@@ -9,6 +9,14 @@ import { loadWorkspace, listAll } from "../src/resources.ts";
 import { WorkspaceView, ErrorPanel } from "../src/WorkspaceView.tsx";
 import { IDs, envelope, errorEnvelope, meta, caseResource, documentResource, jobResource, findingResource, challengeResource, simulationResource, repairResource, reviewResource, auditResource, fixtureBackend, page } from "./fixtures.mjs";
 
+test("a prior immutable review does not block review of a different submitted revision", () => {
+  const repair = { ...repairResource(), repair_proposal_id: crypto.randomUUID(), status: "SUBMITTED" };
+  const resources = { ...emptyResources(), caseResource: caseResource(), job: jobResource(), repair, reviews: [reviewResource()] };
+  assert.equal(canReview(resources), true);
+  resources.reviews.push({ ...reviewResource(), repair_proposal_id: repair.repair_proposal_id });
+  assert.equal(canReview(resources), false);
+});
+
 const config = { baseUrl: "/api/v1", development: true };
 const noop = () => {};
 const view = (overrides = {}) => {

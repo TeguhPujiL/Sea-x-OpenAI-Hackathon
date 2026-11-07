@@ -1,0 +1,48 @@
+# Foundation file inventory
+
+README.md was replaced; other source files were newly created. Generated virtual-environment files and Python caches are excluded.
+
+- `.env.example`
+- `.gitignore`
+- `AGENTS.md`
+- `README.md`
+- `backend/app/__init__.py`
+- `backend/app/api/__init__.py`
+- `backend/app/api/response.py`
+- `backend/app/api/routes/__init__.py`
+- `backend/app/api/routes/analyses.py`
+- `backend/app/api/routes/audit.py`
+- `backend/app/api/routes/cases.py`
+- `backend/app/api/routes/challenges.py`
+- `backend/app/api/routes/documents.py`
+- `backend/app/api/routes/findings.py`
+- `backend/app/api/routes/jobs.py`
+- `backend/app/api/routes/repairs.py`
+- `backend/app/api/routes/reviews.py`
+- `backend/app/api/routes/simulations.py`
+- `backend/app/core/__init__.py`
+- `backend/app/core/config.py`
+- `backend/app/core/database.py`
+- `backend/app/core/security.py`
+- `backend/app/main.py`
+- `backend/app/models/__init__.py`
+- `backend/app/models/base.py`
+- `backend/app/schemas/__init__.py`
+- `backend/app/schemas/shared.py`
+- `backend/pyproject.toml`
+- `backend/tests/test_foundation.py`
+- `docs/CONTRACT_GAPS.md`
+- `docs/CONTRACT_LOCK.md`
+- `docs/FOUNDATION_FILES.md`
+- `docs/OWNERSHIP.md`
+- `docs/VERIFICATION.md`
+- `frontend/.env.example`
+- `frontend/index.html`
+- `frontend/package.json`
+- `frontend/postcss.config.js`
+- `frontend/src/main.tsx`
+- `frontend/src/styles.css`
+- `frontend/src/vite-env.d.ts`
+- `frontend/tailwind.config.js`
+- `frontend/tsconfig.json`
+- `frontend/vite.config.ts`

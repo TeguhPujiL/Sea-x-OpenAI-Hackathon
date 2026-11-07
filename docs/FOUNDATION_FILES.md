@@ -1,0 +1,41 @@
+# Teguh branch file inventory
+
+Files copied/adapted from main 45b0c9e for this branch. Frontend and Simulation/Review/Audit routers are excluded. Local ignored runtimes, caches and dependencies are not part of the branch.
+
+- `.env.example`
+- `.gitignore`
+- `AGENTS.md`
+- `README.md`
+- `backend/app/__init__.py`
+- `backend/app/api/__init__.py`
+- `backend/app/api/response.py`
+- `backend/app/api/routes/__init__.py`
+- `backend/app/api/routes/analyses.py`
+- `backend/app/api/routes/cases.py`
+- `backend/app/api/routes/challenges.py`
+- `backend/app/api/routes/documents.py`
+- `backend/app/api/routes/findings.py`
+- `backend/app/api/routes/jobs.py`
+- `backend/app/api/routes/repairs.py`
+- `backend/app/core/__init__.py`
+- `backend/app/core/config.py`
+- `backend/app/core/database.py`
+- `backend/app/core/init_db.py`
+- `backend/app/core/security.py`
+- `backend/app/main.py`
+- `backend/app/models/__init__.py`
+- `backend/app/models/base.py`
+- `backend/app/models/tables.py`
+- `backend/app/schemas/__init__.py`
+- `backend/app/schemas/shared.py`
+- `backend/pyproject.toml`
+- `backend/requirements.lock.txt`
+- `backend/tests/test_foundation.py`
+- `docs/CONTRACT_GAPS.md`
+- `docs/CONTRACT_LOCK.md`
+- `docs/FOUNDATION_FILES.md`
+- `docs/OWNERSHIP.md`
+- `docs/TEGUH_P0_HANDOFF.md`
+- `docs/VERIFICATION.md`
+- `docs/contract_snapshot.json`
+- `docs/openapi.foundation.json`

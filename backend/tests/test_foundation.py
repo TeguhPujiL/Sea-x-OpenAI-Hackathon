@@ -64,6 +64,11 @@ def test_registered_routes_follow_contract_inventory():
     # Health is an explicit foundation exception, separate from business APIs.
     assert "get" in paths["/api/v1/health"]
     assert "200" in paths["/api/v1/health"]["get"]["responses"]
+    assert {
+        "/api/v1/cases/{case_id}/reviews", "/api/v1/reviews/{review_id}",
+        "/api/v1/cases/{case_id}/audit", "/api/v1/audit-events/{event_id}",
+        "/api/v1/cases/{case_id}/simulations", "/api/v1/simulations/{simulation_id}",
+    } <= set(paths)
     http_methods = {"get", "post", "put", "patch", "delete", "head", "options", "trace"}
     for path, operations in paths.items():
         for method in http_methods.intersection(operations):

@@ -1,7 +1,7 @@
 """Aris-owned synchronous deterministic simulation API."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
@@ -31,7 +31,7 @@ class SimulationRoute(APIRoute):
                 # parameters and missing versions use the user's explicit 422 rule.
                 structural = any(
                     e["type"] in {"extra_forbidden", "json_invalid", "model_attributes_type"}
-                    or e["loc"][0] in {"path", "query"}
+                    or e["loc"][0] in {"path", "query", "header"}
                     or len(e["loc"]) == 1
                     or "finding_id" in e["loc"]
                     for e in errors
@@ -63,12 +63,25 @@ def get_simulation_access(request: Request) -> SimulationAccess:
     return PersistedSimulationAccess(request.app.state.session_factory, policy)
 
 
-router = APIRouter(tags=["simulations"], route_class=SimulationRoute)
+router = APIRouter(tags=["simulations"], route_class=SimulationRoute, responses={
+    status: {"model": Envelope[None], "description": description}
+    for status, description in {
+        400: "VALIDATION_ERROR", 401: "AUTHENTICATION_REQUIRED", 403: "FORBIDDEN",
+        404: "RESOURCE_NOT_FOUND", 409: "IDEMPOTENCY_KEY_REUSED",
+        422: "SIMULATION_INPUT_INVALID", 500: "INTERNAL_ERROR",
+    }.items()
+})
 Service = Annotated[SimulationService, Depends(get_simulation_service)]
 Access = Annotated[SimulationAccess, Depends(get_simulation_access)]
 WriteActor = Annotated[Actor, Depends(require_scope("simulation:write"))]
 ReadActor = Annotated[Actor, Depends(require_scope("simulation:read"))]
-Key = Annotated[str, Depends(require_idempotency_key)]
+
+
+def required_simulation_key(key: Annotated[str, Header(alias="Idempotency-Key")]) -> str:
+    return require_idempotency_key(key)
+
+
+Key = Annotated[str, Depends(required_simulation_key)]
 
 
 @router.post("/cases/{case_id}/simulations", status_code=201, response_model=Envelope[SimulationWire])

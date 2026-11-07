@@ -1,0 +1,2 @@
+# Versioned supplier fixtures are hashed byte-for-byte by the manifest.
+backend/app/services/simulation/fixtures/*.json text eol=lf

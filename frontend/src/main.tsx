@@ -1,14 +1,14 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./styles.css";
+import App from "./App";
+import { readConfig } from "./api";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <main className="mx-auto max-w-3xl p-8">
-      <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Shared foundation</p>
-      <h1 className="mt-2 text-3xl font-semibold">ProcureMind V4.1</h1>
-      <p className="mt-4 text-slate-700">The application shell is ready for team integration.</p>
-      <p className="mt-2 text-sm text-slate-600">Workflow features are pending implementation. Synthetic demo data only. Internal assurance is not statutory approval.</p>
-    </main>
-  </React.StrictMode>,
-);
+document.title = "ProcureMind | Case workspace";
+const root = ReactDOM.createRoot(document.getElementById("root")!);
+try {
+  const config = readConfig(import.meta.env);
+  root.render(<React.StrictMode><App config={config} /></React.StrictMode>);
+} catch (error) {
+  root.render(<main className="configuration-error"><h1>Workspace configuration required</h1><p role="alert">{error instanceof Error ? error.message : "Invalid API configuration."}</p><p>Set VITE_API_BASE_URL and rebuild the frontend. Never include API keys or reviewer identity.</p></main>);
+}

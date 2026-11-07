@@ -22,13 +22,23 @@ export function orderCases(cases: CaseResource[], recentIds: string[]): CaseReso
 }
 
 export const caseHistoryPageSize = 5;
+export type ConclusionFilter = "all" | "concluded" | "not_concluded" | "unavailable";
 export function caseHistoryPage(cases: CaseResource[], recentIds: string[], options: {
-  query: string; category: string; recentOnly: boolean; page: number;
+  query: string; category: string; recentOnly: boolean; page: number; conclusion?: ConclusionFilter;
 }, activity: HistoryActivity = {}) {
   const query = options.query.trim().toLowerCase();
+  const matchesConclusion = (caseId: string) => {
+    if (!options.conclusion || options.conclusion === "all") return true;
+    const entry = activity[caseId];
+    const state = entry?.error ? undefined : entry?.procurementStatus?.state;
+    if (options.conclusion === "concluded") return state === "GO" || state === "NO_GO";
+    if (options.conclusion === "not_concluded") return state === "PENDING";
+    return !state || state === "UNAVAILABLE" || state === "LOADING";
+  };
   const filtered = cases.filter(c => !c.deleted_at
     && (!options.category || c.category === options.category)
     && (!options.recentOnly || recentIds.includes(c.case_id))
+    && matchesConclusion(c.case_id)
     && `${c.title} ${c.case_number} ${c.case_id}`.toLowerCase().includes(query))
     .sort((a, b) => Date.parse(latestActivity(b, activity[b.case_id])) - Date.parse(latestActivity(a, activity[a.case_id]))
       || Date.parse(b.created_at) - Date.parse(a.created_at) || b.case_id.localeCompare(a.case_id));

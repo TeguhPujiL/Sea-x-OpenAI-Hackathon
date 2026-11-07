@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { CaseResource } from "./contracts";
-import { caseHistoryPage } from "./history";
+import { caseHistoryPage, type ConclusionFilter } from "./history";
 import { latestActivity, stepActivity, type HistoryActivity } from "./historyActivity";
 import { Timestamp } from "./Timestamp";
 import { ProcurementDecisionStatus } from "./ProcurementDecisionStatus";
@@ -13,18 +13,24 @@ export function CaseHistory({ cases, activity = {}, recentIds, activeId, loading
   const [query, setQuery] = useState("");
   const [recentOnly, setRecentOnly] = useState(false);
   const [category, setCategory] = useState("");
+  const [conclusion, setConclusion] = useState<ConclusionFilter>("all");
   const [page, setPage] = useState(1);
   const categories = [...new Set(cases.filter(c => !c.deleted_at).map(c => c.category))].sort();
-  const result = caseHistoryPage(cases, recentIds, { query, category, recentOnly, page }, activity);
+  const result = caseHistoryPage(cases, recentIds, { query, category, recentOnly, page, conclusion }, activity);
   const items = result.items;
   return <section className="panel case-history" aria-label="Case history">
     <div className="split"><div><h2>Case history</h2><p>Reopen an available case to view its documents, analysis, and audit history.</p></div>
       <button className="quiet" onClick={onClose}>Close history</button></div>
     <div className="history-controls"><label className="field"><span>Search cases</span><input value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} placeholder="Case title, number, or ID" /></label>
       <label className="field"><span>Category</span><select value={category} onChange={e => { setCategory(e.target.value); setPage(1); }}><option value="">All categories</option>{categories.map(value => <option key={value} value={value}>{value.replaceAll("_", " ").toLowerCase()}</option>)}</select></label>
+      <label className="field"><span>Conclusion status</span><select value={conclusion} onChange={e => { setConclusion(e.target.value as ConclusionFilter); setPage(1); }}>
+        <option value="all">All cases</option><option value="concluded">Concluded (GO / NO-GO)</option>
+        <option value="not_concluded">Not concluded</option><option value="unavailable">Status unavailable</option>
+      </select></label>
       <label className="checkbox"><input type="checkbox" checked={recentOnly} onChange={e => { setRecentOnly(e.target.checked); setPage(1); }} />Recently opened only</label>
       <button className="secondary" onClick={onRefresh} disabled={loading || disabled}>Refresh cases</button></div>
     <p className="muted">Most recently updated cases appear first, with 5 cases per page. Ordering includes recorded workflow activity. Times use your local time zone; hover to see the saved UTC timestamp.</p>
+    <p className="muted">Concluded means a saved GO or NO-GO for the latest assessment. Cases whose status could not be loaded appear under Status unavailable.</p>
     {loading ? <p role="status">Loading case history…</p> : error ? <p role="alert" className="inline-warning">{error}</p> : !items.length ? <p>No matching cases available.</p> :
       <ul className="history-list">{items.map(c => <li key={c.case_id}><div><strong>{c.title}</strong><p>{c.case_number} · {c.case_status.replaceAll("_", " ").toLowerCase()}{recentIds.includes(c.case_id) ? " · Recently opened" : ""}</p><p className="history-updated">Last updated: <Timestamp value={c.updated_at} /></p><code>{c.case_id}</code></div>
         <div className="history-activity"><ProcurementDecisionStatus status={activity[c.case_id]?.procurementStatus ?? {

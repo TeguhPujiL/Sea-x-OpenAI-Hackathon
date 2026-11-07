@@ -1,3 +1,6 @@
+import logging
+import traceback
+from pathlib import Path
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
@@ -54,7 +57,13 @@ def create_app(settings: Settings | None = None, *, simulation_lookup: Simulatio
         request.state.request_id = candidate if candidate and len(candidate) <= 128 and all(32 < ord(c) < 127 for c in candidate) else f"req_{uuid4().hex}"
         try:
             response = await call_next(request)
-        except Exception:
+        except Exception as error:
+            # Do not log exception messages, SQL parameters, request bodies or locals.
+            frames = " > ".join(f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}"
+                                for frame in traceback.extract_tb(error.__traceback__))
+            logging.getLogger("procuremind.errors").error(
+                "Unhandled request request_id=%s error_type=%s frames=%s",
+                request.state.request_id, type(error).__name__, frames)
             response = failure(ApiError(500, "INTERNAL_ERROR", "Internal server error"), request.state.request_id)
         response.headers["X-Request-ID"] = request.state.request_id
         return response

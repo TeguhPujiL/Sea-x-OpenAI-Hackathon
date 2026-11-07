@@ -1,4 +1,5 @@
 """Synchronous structured-output adapter for Challenge and Repair only."""
+from app.services.ai.schema import structured_output_schema
 from dataclasses import dataclass
 import json
 from typing import Literal, Protocol
@@ -68,7 +69,7 @@ class OpenAIDecisionProvider:
             response = client.responses.create(model=settings.openai_model, instructions=instructions,
                 input=json.dumps(context, ensure_ascii=False), store=False,
                 text={"format": {"type": "json_schema", "name": f"procuremind_{kind}_v1",
-                    "schema": output.model_json_schema(), "strict": True}})
+                    "schema": structured_output_schema(output), "strict": True}})
             usage = None if response.usage is None else {"input_tokens": response.usage.input_tokens,
                 "output_tokens": response.usage.output_tokens}
             return DecisionResult(response.output_text or "", response.model, usage, getattr(response, "status", None))

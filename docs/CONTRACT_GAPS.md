@@ -121,3 +121,14 @@ Repair idempotency uses actor/POST-route/key leases with expiry provider-timeout
 Submission creates an immutable versioned snapshot and moves the case to UNDER_REVIEW/READY_FOR_REVIEW, not final approval. The frontend must refresh case.version. Review owners retain their own scope/decision/assurance logic; the exported precondition adapter is read-only. Legacy submitted rows without snapshots fail closed rather than inventing history.
 
 No downstream v1.1 create request has a challenge FK. The default reference lookup honors explicit stored challenge references; integrators adding other links must extend the typed ReferenceLookup. Challenge PATCH fields are question/status/expected_version; repair PATCH fields are proposed_text/status/expected_version as shown in Section 6 examples. Any broader field set or changed wire semantics needs an approved versioned clarification.
+
+
+## G14 - Audit hash-chain implementation mismatch
+
+Status: **OPEN / PROPOSED IMPLEMENTATION REMEDIATION**.
+
+Contract pages 32-33 illustrate string previous_hash/event_hash and describe tamper evidence from hash chaining. The integrated Assurance service currently persists and returns null hashes, as documented in ASSURANCE_INTEGRATION.md; its OpenAPI also permits null. This is an implementation limitation, not an approved change to v1.1.
+
+The frontend accepts explicit null hashes so existing audit records remain readable and labels unavailable event hashes. It does not manufacture hashes or claim chain verification. Missing fields and non-string/non-null values remain invalid. Historical actor snapshots may also have explicit null name/role; the frontend displays unavailable identity metadata without inventing it, while reviews still require complete reviewer snapshots.
+
+PROPOSED: Assurance owner to implement and test deterministic chained hashing with concurrency and legacy-record handling, or obtain a versioned contract revision explicitly allowing absent hashes. No existing immutable audit records are rewritten by this UI fix. Clean-case completion remains G01 and is not unlocked by this compatibility handling.

@@ -308,6 +308,7 @@ def test_real_decision_sdk_adapter_uses_strict_schema_and_actual_model():
         assert result.model=="returned-runtime-model" and result.usage is None
         assert calls[-1]["text"]["format"]["strict"] is True
         assert calls[-1]["text"]["format"]["schema"]["additionalProperties"] is False
+        assert calls[-1]["text"]["format"]["schema"]["$defs"]["Citation"]["properties"]["document_id"]["format"] == "uuid"
         assert calls[-1]["store"] is False
 
 

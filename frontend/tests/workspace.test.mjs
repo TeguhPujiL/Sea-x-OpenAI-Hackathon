@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createClient, RequestError, TransportError, readConfig, normalize, requiresIdempotency } from "../src/api.ts";
-import { decodeCase, decodeDocument, decodeJob, decodeFinding, decodeChallenge, decodeSimulation, decodeRepair, decodeReview, decodeEnvelope, ShapeError, uuid } from "../src/contracts.ts";
+import { decodeCase, decodeDocument, decodeJob, decodeFinding, decodeChallenge, decodeSimulation, decodeRepair, decodeReview, decodeAudit, decodeEnvelope, ShapeError, uuid } from "../src/contracts.ts";
 import { emptyIds, emptyResources, saveIds, readIds, storageKey, hasRequiredDocuments, pollJob, cleanCase, canReview, recoveredStep } from "../src/workflow.ts";
 import { loadWorkspace, listAll } from "../src/resources.ts";
 import { WorkspaceView, ErrorPanel } from "../src/WorkspaceView.tsx";
@@ -181,7 +181,7 @@ test("all six steps, labelled controls, skip link and current-step semantics are
 });
 test("recorded review is immutable UI and preserves server reviewer/audit provenance", () => {
   const resources = fullResources(); resources.repair.status = "APPROVED"; resources.reviews = [reviewResource()]; resources.audit = [auditResource()];
-  const html = view({ resources, ids: fullIds(), step: 5 }); assert.match(html, /Synthetic test reviewer/); assert.match(html, new RegExp(IDs.actor)); assert.match(html, /Audit timeline/); assert.match(html, /test-only-event-hash/);
+  const html = view({ resources, ids: fullIds(), step: 5 }); assert.match(html, /Synthetic test reviewer/); assert.match(html, new RegExp(IDs.actor)); assert.match(html, /Audit timeline/); assert.match(html, /hash chain not implemented/);
   assert.doesNotMatch(html, /<select name="decision"/); assert.doesNotMatch(html, /Record internal review<\/button>/); assert.equal(canReview(resources), false);
 });
 test("complete synthetic contract journey, stale repair, and authoritative refresh recovery", async () => {
@@ -211,4 +211,44 @@ test("complete synthetic contract journey, stale repair, and authoritative refre
   assert.ok(requests.every(v => !v.body || v.body instanceof FormData || !Object.hasOwn(v.body, "reviewer_actor_id")));
   const simulationRequest = requests.find(v => v.method === "POST" && v.path.endsWith("/simulations")); assert.deepEqual(Object.keys(simulationRequest.body).sort(), ["alternative", "baseline", "finding_id", "supplier_data_version"]);
   assert.equal(requests.find(v => v.method === "POST" && v.path.endsWith("/challenges")).key, null);
+});
+
+
+test("audit reads accept the owner's explicit null hashes without fabricating provenance", async () => {
+  const event = auditResource();
+  const client = createClient(config, async () => Response.json(envelope(page([event]))));
+  const audit = await listAll(client, `/cases/${IDs.case}/audit`, decodeAudit);
+  assert.equal(audit.length, 1);
+  assert.equal(audit[0].event_hash, null);
+  assert.equal(audit[0].previous_hash, null);
+  assert.equal(decodeAudit({ ...event, event_hash: "stored-hash" }).event_hash, "stored-hash");
+  for (const bad of [undefined, 123, {}, false]) {
+    assert.throws(() => decodeAudit({ ...event, event_hash: bad }), ShapeError);
+    assert.throws(() => decodeAudit({ ...event, previous_hash: bad }), ShapeError);
+  }
+  const legacy = decodeAudit({ ...event, actor: { actor_id: IDs.actor, display_name: null, role: null } });
+  const resources = fullResources(); resources.audit = [legacy];
+  const html = view({ resources, ids: fullIds(), step: 5 });
+  assert.match(html, /Actor name unavailable/);
+  assert.match(html, /hash chain not implemented/);
+  assert.throws(() => decodeReview({ ...reviewResource(), reviewer: legacy.actor }), ShapeError);
+});
+
+
+test("failed job with no provider response decodes and displays the authoritative failure", async () => {
+  const job = jobResource("FAILED");
+  job.ai_execution = { ...jobResource().ai_execution, model: null, schema_valid: false, evidence_validation_passed: false, evidence_checks: { checked: 0, passed: 0, failed: 0 }, usage: null };
+  job.error = { code: "AI_PROVIDER_ERROR", message: "Analysis could not produce a usable validated result.", retryable: false };
+  const client = createClient(config, async () => Response.json(envelope(job)));
+  const loaded = await client.get(`/jobs/${IDs.job}`, decodeJob);
+  assert.equal(loaded.status, "FAILED");
+  assert.equal(loaded.ai_execution.model, null);
+  const resources = fullResources(); resources.job = loaded; resources.findings = [];
+  const html = view({ resources, ids: fullIds(), step: 1 });
+  assert.match(html, /AI_PROVIDER_ERROR/);
+  assert.match(html, /Not reported \(no provider response\)/);
+  assert.doesNotMatch(html, /No integrity findings detected/);
+  assert.throws(() => decodeJob({ ...job, ai_execution: { ...job.ai_execution, model: 123 } }), ShapeError);
+  const { model, ...missingModel } = job.ai_execution;
+  assert.throws(() => decodeJob({ ...job, ai_execution: missingModel }), ShapeError);
 });

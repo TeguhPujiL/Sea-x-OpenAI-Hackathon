@@ -23,7 +23,7 @@ export interface DocumentResource {
   version: number; uploaded_at: string; deleted_at: string | null;
 }
 export interface AiExecution {
-  execution_id: string; provider: string; model: string; operation: string; prompt_version: string;
+  execution_id: string; provider: string; model: string | null; operation: string; prompt_version: string;
   input_document_ids: string[]; schema_valid: boolean; evidence_validation_passed: boolean;
   evidence_checks: { checked: number; passed: number; failed: number }; latency_ms: number;
   usage: { input_tokens: number; output_tokens: number } | null;
@@ -66,8 +66,8 @@ export interface ReviewResource {
   review_status: "COMPLETED"; reviewer: Actor; assurance_status_after: CaseResource["assurance_status"]; created_at: string;
 }
 export interface AuditResource {
-  event_id: string; case_id: string; event_type: string; actor: Actor; resource: { type: string; id: string; version: number };
-  occurred_at: string; request_id: string; details: Record<string, unknown>; previous_hash: string | null; event_hash: string;
+  event_id: string; case_id: string; event_type: string; actor: { actor_id: string; display_name: string | null; role: string | null }; resource: { type: string; id: string; version: number };
+  occurred_at: string; request_id: string; details: Record<string, unknown>; previous_hash: string | null; event_hash: string | null;
 }
 export interface Page<T> { items: T[]; pagination: { limit: number; offset: number; total: number } }
 export interface CaseInput { title: string; category: string; description: string; quantity: number; budget_ceiling_idr: number; currency: "IDR" }
@@ -111,7 +111,7 @@ export const decodeCase = decode<CaseResource>("case", { ...versioned, case_numb
 export const decodeDocument = decode<DocumentResource>("document", { document_id: uuid, case_id: uuid, filename: text, document_type: oneOf(documentTypes), description: nullable(text), mime_type: oneOf(["application/pdf"]), size_bytes: v => integer(v, 1), sha256: v => typeof v === "string" && /^[a-f0-9]{64}$/i.test(v), page_count: v => integer(v, 1), processing_status: oneOf(statuses), version, uploaded_at: utc, deleted_at: nullable(utc) });
 const nestedError = recordCheck({ code: text, message: text, retryable: bool });
 export const decodeJob = decode<JobResource>("job", { ...resource, job_id: uuid, job_type: text, status: oneOf(statuses), progress_percent: v => typeof v === "number" && v >= 0 && v <= 100,
-  ai_execution: nullable(recordCheck({ execution_id: uuid, provider: text, model: text, operation: text, prompt_version: text, input_document_ids: array(uuid), schema_valid: bool, evidence_validation_passed: bool, evidence_checks: recordCheck({ checked: v => integer(v), passed: v => integer(v), failed: v => integer(v) }), latency_ms: v => integer(v), usage: nullable(recordCheck({ input_tokens: v => integer(v), output_tokens: v => integer(v) })) })),
+  ai_execution: nullable(recordCheck({ execution_id: uuid, provider: text, model: nullable(text), operation: text, prompt_version: text, input_document_ids: array(uuid), schema_valid: bool, evidence_validation_passed: bool, evidence_checks: recordCheck({ checked: v => integer(v), passed: v => integer(v), failed: v => integer(v) }), latency_ms: v => integer(v), usage: nullable(recordCheck({ input_tokens: v => integer(v), output_tokens: v => integer(v) })) })),
   result: nullable(recordCheck({ finding_ids: array(uuid) })), warnings: array(recordCheck({ code: text, message: text })), error: nullable(nestedError), started_at: nullable(utc), completed_at: nullable(utc)
 }, v => v.status === "COMPLETED" || v.status === "NEEDS_REVIEW" ? v.result !== null : v.result === null);
 export const decodeFinding = decode<FindingResource>("finding", { ...versioned, finding_id: uuid, analysis_job_id: uuid, ai_execution_id: uuid, type: text, severity: oneOf(["LOW", "MEDIUM", "HIGH", "CRITICAL"]), status: oneOf(["OPEN", "UNDER_REVIEW", "RESOLVED", "DISMISSED"]), title: text, summary: text, confidence: v => typeof v === "number" && v >= 0 && v <= 1, evidence_status: oneOf(evidenceStatuses), evidence: array(recordCheck({ document_id: uuid, page_number: v => integer(v, 1), excerpt: text, verification_status: oneOf(evidenceStatuses) })), assignee_id: nullable(uuid), resolution_note: nullable(text) });
@@ -119,7 +119,7 @@ export const decodeChallenge = decode<ChallengeResource>("challenge", { ...versi
 export const decodeSimulation = decode<SimulationResource>("simulation", { ...resource, simulation_id: uuid, finding_id: uuid, engine_version: text, input_snapshot: recordCheck({ quantity: v => integer(v, 1), baseline: recordCheck({ minimum_ram_gb: v => integer(v, 1) }), alternative: recordCheck({ minimum_ram_gb: v => integer(v, 1) }), suppliers: array(recordCheck({ supplier_ref: text, ram_gb: v => integer(v, 1), unit_price_idr: v => integer(v) })) }), result: recordCheck({ baseline: metric(false), alternative: metric(false), delta: metric(true) }), interpretation: text }, v => v.supplier_data_version === undefined || typeof v.supplier_data_version === "string");
 export const decodeRepair = decode<RepairResource>("repair", { ...versioned, repair_proposal_id: uuid, finding_id: uuid, status: oneOf(["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "WITHDRAWN"]), action_type: oneOf(repairActions), before_text: text, proposed_text: text, justification: text, simulation_id: uuid, ai_execution_id: uuid, human_edits: bool });
 export const decodeReview = decode<ReviewResource>("review", { ...resource, review_id: uuid, repair_proposal_id: uuid, decision: oneOf(reviewDecisions), decision_reason: text, review_status: oneOf(["COMPLETED"]), reviewer: actor, assurance_status_after: assurance });
-export const decodeAudit = decode<AuditResource>("audit", { ...{ case_id: uuid }, event_id: uuid, event_type: text, actor, resource: recordCheck({ type: text, id: uuid, version }), occurred_at: utc, request_id: text, details: v => typeof v === "object" && v !== null && !Array.isArray(v), previous_hash: nullable(text), event_hash: text });
+export const decodeAudit = decode<AuditResource>("audit", { ...{ case_id: uuid }, event_id: uuid, event_type: text, actor: recordCheck({ actor_id: uuid, display_name: nullable(text), role: nullable(text) }), resource: recordCheck({ type: text, id: uuid, version }), occurred_at: utc, request_id: text, details: v => typeof v === "object" && v !== null && !Array.isArray(v), previous_hash: nullable(text), event_hash: nullable(text) });
 export function pageDecoder<T>(item: Decoder<T>): Decoder<Page<T>> {
   return value => { const v = object(value); if (!Array.isArray(v.items) || !recordCheck({ limit: version, offset: v => integer(v), total: v => integer(v) })(v.pagination)) throw new ShapeError("Invalid paginated response."); return { items: v.items.map(item), pagination: v.pagination as Page<T>["pagination"] }; };
 }

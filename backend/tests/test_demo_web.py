@@ -37,5 +37,7 @@ def test_web_ui_api_and_owner_acl_ports_share_one_origin(tmp_path):
         timeline=client.get(f'/api/v1/cases/{cid}/audit')
         assert timeline.status_code==200,timeline.text
         assert timeline.json()['data']['items'][0]['event_type']=='CASE_CREATED'
+        assert timeline.json()['data']['items'][0]['event_hash'] is None
+        assert timeline.json()['data']['items'][0]['previous_hash'] is None
         bad=client.post(f'/api/v1/cases/{cid}/simulations',headers={'Idempotency-Key':'missing-finding'},json={'finding_id':str(uuid4()),'baseline':{'minimum_ram_gb':32},'alternative':{'minimum_ram_gb':16},'supplier_data_version':'synthetic-suppliers-v1'})
         assert bad.status_code==404,bad.text

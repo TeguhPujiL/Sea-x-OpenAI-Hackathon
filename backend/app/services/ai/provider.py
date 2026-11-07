@@ -1,4 +1,5 @@
 """OpenAI Responses structured-output adapter. No live-response fallback."""
+from app.services.ai.schema import structured_output_schema
 from dataclasses import dataclass
 import json
 from openai import OpenAI, APITimeoutError, RateLimitError, APIError
@@ -46,7 +47,7 @@ class OpenAIAnalysisProvider:
                     "Severity is risk, not extraction quality. Use uncertainty conservatively."),
                 input=json.dumps({"analysis_types": analysis_types, "pages": pages}, ensure_ascii=False),
                 text={"format": {"type": "json_schema", "name": "procurement_analysis_v1",
-                    "schema": AnalysisOutput.model_json_schema(), "strict": True}},
+                    "schema": structured_output_schema(AnalysisOutput), "strict": True}},
                 store=False,
             )
             usage = None if response.usage is None else {

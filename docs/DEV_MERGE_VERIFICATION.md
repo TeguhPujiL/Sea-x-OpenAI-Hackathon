@@ -1,3 +1,30 @@
+# Aris into dev: vendor recommendations and branding
+
+7 November 2026 (Asia/Jakarta). Merge inputs: dev f92ef02 and aris 809c525.
+Both histories are preserved. Includes per-proposal result/recommendation cards,
+removal of Human review from the summary, case updated timestamps and the branded
+ProcureMind favicon.
+
+History conflicts preserve dev's latest audit activity, six step timestamp groups,
+authorized paginated activity loading and fallback behavior. Aris's explicit
+Last updated timestamp remains visible using the shared Timestamp component.
+Ordering includes latest recorded case/audit activity, then creation time/ID for
+stable ties; filtering and five-case pagination remain unchanged. Tests from both
+branches are retained; timestamp assertions target the Last updated row field.
+
+Executed on the merged tree:
+
+- Frontend Node tests: 74 passed.
+- TypeScript typecheck and Vite production build: passed.
+- git diff --check: passed.
+
+No backend implementation changed; backend tests were not rerun for this frontend
+merge. No Docker redeployment, interactive browser verification or live AI request
+was performed for the merge. Earlier local aris deployment checks are separate.
+No credentials, .env files or local data are committed.
+
+---
+
 # Aris into dev: 7 November 2026
 
 Merged aris 185a8ab into dev c3738d7, preserving both histories. Includes local

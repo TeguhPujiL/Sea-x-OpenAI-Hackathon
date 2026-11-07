@@ -146,7 +146,7 @@ calls with no returned model/usage now show their real error instead of a client
 shape error; malformed non-null values still fail validation. The model name is
 never fabricated from the configured requested model.
 
-History defaults to newest created_at first and five cases per page, with category,
+History defaults to updated_at descending and five cases per page, with category,
 text and recently-opened filters. Filter changes reset the page. Pagination clamps
 when fewer results remain. Category options come from authorized backend cases;
 filtering/pagination are client-side over the existing paginated GET /cases data,
@@ -168,3 +168,47 @@ existing DELETE /cases/{id} request (reason, expected_version). Success removes
 that case from the visible history and local recent IDs, and clears the workspace
 if it was active. No new backend route or shared schema is introduced. Server
 scope/access checks, active-analysis/review protections and soft deletion apply.
+
+
+## Vendor proposal summaries and recommendations
+
+Assure starts with a card for each active SUPPLIER_QUOTATION document. Every card
+shows its recorded analysis coverage, result, recommendation and actionable next
+steps. Open findings citing that proposal lead to a clarification recommendation;
+unresolved findings without a vendor reference are shown as shared case context.
+A finding on one proposal is not attributed to another vendor. Closed findings
+recommend checking the recorded resolution before continuing evaluation. Proposals
+with no recorded issues receive next steps for detailed technical/commercial
+evaluation. Filenames identify proposal documents; vendor identities are not
+inferred or merged from filenames.
+
+Unassessed proposals, failed/pending analysis, absent execution metadata, evidence
+warnings, incomplete finding lists and absent requirement baseline each produce
+an appropriate prerequisite action. No positive compliance verdict is inferred.
+Requirements and finding counts remain analysis-wide context, not per-vendor
+satisfaction counts. Supporting evidence retains its document/page provenance.
+
+Human review information has been removed from this summary. The separate formal
+review controls, immutable decisions and audit timeline remain unchanged. No new
+AI request, public schema field, API route or persistence table is introduced.
+History reopening and refresh rebuild these recommendations from server records.
+The clean-case completion gap remains visible.
+
+Case history shows each case's server updated_at timestamp in local display time
+with UTC retained in the time element. History also retains dev's workflow activity
+and step timestamps. Sorting uses the latest server case/audit timestamp descending,
+then created_at and ID for stable ties, before the pagination slice. If audit
+activity is unavailable, case timestamps determine the order.
+Recently opened IDs do not override update ordering. Five-case pagination and
+category/search/recent filters are retained.
+
+The browser favicon uses public/favicon.svg, matching the existing ProcureMind
+P/ascending-arrow brand mark and colors. Vite copies it into the Docker static
+build; index.html links it for both the login page and case workspace.
+
+
+Executed verification for this update: 70 frontend Node tests passed; TypeScript
+and Vite production build passed. Docker rebuilt and became healthy. HTTP checks
+verified the favicon link/SVG response, deployed recommendation/history assets,
+authorized case timestamps and logout. The existing synthetic persistence check
+also passed. No extra live AI call or interactive visual browser check was made.

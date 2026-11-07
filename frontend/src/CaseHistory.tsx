@@ -23,9 +23,9 @@ export function CaseHistory({ cases, activity = {}, recentIds, activeId, loading
       <label className="field"><span>Category</span><select value={category} onChange={e => { setCategory(e.target.value); setPage(1); }}><option value="">All categories</option>{categories.map(value => <option key={value} value={value}>{value.replaceAll("_", " ").toLowerCase()}</option>)}</select></label>
       <label className="checkbox"><input type="checkbox" checked={recentOnly} onChange={e => { setRecentOnly(e.target.checked); setPage(1); }} />Recently opened only</label>
       <button className="secondary" onClick={onRefresh} disabled={loading || disabled}>Refresh cases</button></div>
-    <p className="muted">Latest activity appears first, with 5 cases per page. Times use your local time zone; hover to see the saved UTC timestamp.</p>
+    <p className="muted">Most recently updated cases appear first, with 5 cases per page. Ordering includes recorded workflow activity. Times use your local time zone; hover to see the saved UTC timestamp.</p>
     {loading ? <p role="status">Loading case history…</p> : error ? <p role="alert" className="inline-warning">{error}</p> : !items.length ? <p>No matching cases available.</p> :
-      <ul className="history-list">{items.map(c => <li key={c.case_id}><div><strong>{c.title}</strong><p>{c.case_number} · {c.case_status.replaceAll("_", " ").toLowerCase()}{recentIds.includes(c.case_id) ? " · Recently opened" : ""}</p><code>{c.case_id}</code></div>
+      <ul className="history-list">{items.map(c => <li key={c.case_id}><div><strong>{c.title}</strong><p>{c.case_number} · {c.case_status.replaceAll("_", " ").toLowerCase()}{recentIds.includes(c.case_id) ? " · Recently opened" : ""}</p><p className="history-updated">Last updated: <Timestamp value={c.updated_at} /></p><code>{c.case_id}</code></div>
         <div className="history-activity"><p><strong>{activity[c.case_id] && !activity[c.case_id].error ? "Latest activity" : "Case updated"}</strong><br /><Timestamp value={latestActivity(c, activity[c.case_id])} /></p>
           <details><summary>Step timestamps</summary>
             {!activity[c.case_id] || activity[c.case_id].error ? <p role="status">Step history unavailable. {activity[c.case_id]?.error ?? "Refresh cases to load recorded activity."}</p> :

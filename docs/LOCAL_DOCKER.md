@@ -47,7 +47,7 @@ do not use that option for a database you want to keep.
 
 ## Test the UI
 
-1. Sign in, create a case, then open **Case history** to search/reopen it. Filter by Category and use Previous/Next to browse five newest-first cases per page. **Delete case** asks for confirmation and a reason; the existing server endpoint soft-deletes it with expected_version. Active analyses and reviewed cases remain protected; audit records and PDF bytes are retained.
+1. Sign in, create a case, then open **Case history** to search/reopen it. Filter by Category and use Previous/Next to browse five most recently updated cases per page. Each row shows Last updated from the server case timestamp. **Delete case** asks for confirmation and a reason; the existing server endpoint soft-deletes it with expected_version. Active analyses and reviewed cases remain protected; audit records and PDF bytes are retained.
 2. Select several PDFs and choose **Upload selected PDFs**. Each file uses its
    own existing upload endpoint and idempotency key. Partial failures are shown
    separately; retry skips successful files.
@@ -147,3 +147,37 @@ POST analysis (202), poll to COMPLETED with schema_valid=true and
 evidence_validation_passed=true using gpt-6.1-sol, then soft-delete only the
 synthetic test case and verify it no longer appears in case history. This was an
 explicit live check, separate from the mocked automated test suite.
+
+
+## Read vendor proposal recommendations in Assure
+
+Classify vendor proposals as **Supplier quotation** in Upload and save the types.
+After analysis, open **Assure**: each proposal gets a result and recommendation,
+including proposals with no recorded issues. Findings for that proposal link to
+source evidence; shared unresolved case findings are listed separately. Missing
+analysis coverage, failed/pending jobs and evidence gaps recommend the required
+next action. For a proposal with no recorded issues, the recommendation is to
+continue detailed evaluation and confirm mandatory requirements and commercial
+terms before final selection. A later upload requires a new analysis.
+
+Human review has been removed from the summary. Formal review controls and audit
+history remain separate. These recommendations use existing analysis records and
+make no extra AI request. They do not fabricate an all-requirements-satisfied
+verdict or change existing clean-case completion restrictions. Reopen a case from
+history or refresh resources to load its recorded results.
+
+
+Case history displays **Last updated** on every row using the backend case's
+updated_at value, formatted in the browser's local time. Most recently updated
+cases appear first, including recorded workflow/audit activity where available,
+with stable tie-breaking and five cases per page. Step timestamps remain available. Category,
+search and recently-opened filters remain available.
+
+The browser tab uses the ProcureMind P/ascending-arrow icon at /favicon.svg.
+Refresh the page after rebuilding to load the new icon and UI. A container restart
+requires signing in again; the data volume remains intact.
+
+This update passed 70 frontend tests, typecheck and production build. Docker
+health, favicon/static assets, login/case timestamps and the retained synthetic
+case/document persistence checks passed. Interactive browser visual verification
+was not performed; recommendations use the existing records with no new AI call.

@@ -1,0 +1,9 @@
+{
+  "supplier_data_version": "synthetic-suppliers-v1",
+  "quantity": 50,
+  "suppliers": [
+    {"supplier_id": "SYN-A", "ram_gb": 16, "unit_price_idr": 13200000},
+    {"supplier_id": "SYN-B", "ram_gb": 16, "unit_price_idr": 13800000},
+    {"supplier_id": "SYN-C", "ram_gb": 32, "unit_price_idr": 16500000}
+  ]
+}

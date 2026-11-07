@@ -1,57 +1,101 @@
-# Foundation file inventory
+# Teguh branch file inventory
 
-Exact new source/documentation files for this implementation. Ignored virtual environment, portable runtime, caches, frontend dependencies and build output are excluded.
+Current Prompt B changes and full source inventory. Ignored runtimes, dependencies, stored PDFs, databases and caches are excluded.
 
-## Created
+## Created in Prompt B
+
+- `backend/app/api/decision_presenters.py`
+- `backend/app/core/integration.py`
+- `backend/app/models/decisions.py`
+- `backend/app/schemas/decisions.py`
+- `backend/app/services/ai/decisions.py`
+- `backend/app/services/decision_evidence.py`
+- `backend/app/services/decision_generation.py`
+- `backend/tests/test_decisions.py`
+- `docs/TEGUH_DECISION_HANDOFF.md`
+
+## Updated in Prompt B
+
+- `.env.example`
+- `AGENTS.md`
+- `README.md`
+- `backend/app/api/routes/challenges.py`
+- `backend/app/api/routes/repairs.py`
+- `backend/app/core/migrations.py`
+- `backend/app/core/security.py`
+- `backend/app/core/transactions.py`
+- `backend/app/main.py`
+- `backend/app/models/__init__.py`
+- `backend/app/models/tables.py`
+- `backend/tests/test_foundation.py`
+- `docs/CONTRACT_GAPS.md`
+- `docs/CONTRACT_LOCK.md`
+- `docs/FOUNDATION_FILES.md`
+- `docs/TEGUH_P0_HANDOFF.md`
+- `docs/VERIFICATION.md`
+- `docs/openapi.teguh-p0.json`
+
+## All branch files
 
 - `.env.example`
 - `.gitignore`
 - `AGENTS.md`
+- `README.md`
 - `backend/app/__init__.py`
 - `backend/app/api/__init__.py`
+- `backend/app/api/decision_presenters.py`
+- `backend/app/api/presenters.py`
 - `backend/app/api/response.py`
 - `backend/app/api/routes/__init__.py`
 - `backend/app/api/routes/analyses.py`
-- `backend/app/api/routes/audit.py`
 - `backend/app/api/routes/cases.py`
 - `backend/app/api/routes/challenges.py`
 - `backend/app/api/routes/documents.py`
 - `backend/app/api/routes/findings.py`
 - `backend/app/api/routes/jobs.py`
 - `backend/app/api/routes/repairs.py`
-- `backend/app/api/routes/reviews.py`
-- `backend/app/api/routes/simulations.py`
 - `backend/app/core/__init__.py`
+- `backend/app/core/access.py`
 - `backend/app/core/config.py`
 - `backend/app/core/database.py`
 - `backend/app/core/init_db.py`
+- `backend/app/core/integration.py`
+- `backend/app/core/migrations.py`
 - `backend/app/core/security.py`
+- `backend/app/core/transactions.py`
+- `backend/app/core/upload_limit.py`
 - `backend/app/main.py`
 - `backend/app/models/__init__.py`
+- `backend/app/models/access.py`
 - `backend/app/models/base.py`
+- `backend/app/models/decisions.py`
+- `backend/app/models/integrity.py`
 - `backend/app/models/tables.py`
 - `backend/app/schemas/__init__.py`
+- `backend/app/schemas/decisions.py`
+- `backend/app/schemas/p0.py`
 - `backend/app/schemas/shared.py`
+- `backend/app/services/__init__.py`
+- `backend/app/services/ai/__init__.py`
+- `backend/app/services/ai/decisions.py`
+- `backend/app/services/ai/jobs.py`
+- `backend/app/services/ai/provider.py`
+- `backend/app/services/decision_evidence.py`
+- `backend/app/services/decision_generation.py`
+- `backend/app/services/documents/__init__.py`
+- `backend/app/services/documents/pdf.py`
 - `backend/pyproject.toml`
 - `backend/requirements.lock.txt`
+- `backend/tests/test_decisions.py`
 - `backend/tests/test_foundation.py`
-- `docs/FOUNDATION_FILES.md`
-- `docs/openapi.foundation.json`
-- `frontend/.env.example`
-- `frontend/index.html`
-- `frontend/package-lock.json`
-- `frontend/package.json`
-- `frontend/postcss.config.js`
-- `frontend/src/main.tsx`
-- `frontend/src/styles.css`
-- `frontend/src/vite-env.d.ts`
-- `frontend/tailwind.config.js`
-- `frontend/tsconfig.json`
-- `frontend/vite.config.ts`
-
-## Updated
-
-- `README.md`
+- `backend/tests/test_p0.py`
 - `docs/CONTRACT_GAPS.md`
 - `docs/CONTRACT_LOCK.md`
+- `docs/FOUNDATION_FILES.md`
+- `docs/OWNERSHIP.md`
+- `docs/TEGUH_DECISION_HANDOFF.md`
+- `docs/TEGUH_P0_HANDOFF.md`
 - `docs/VERIFICATION.md`
+- `docs/contract_snapshot.json`
+- `docs/openapi.foundation.json`
+- `docs/openapi.teguh-p0.json`

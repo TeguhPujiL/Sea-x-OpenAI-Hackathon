@@ -59,6 +59,10 @@ class AnalysisJob(Identity, Created, Base):
     __tablename__ = "analysis_jobs"
     case_id = Column(UuidV4, ForeignKey("cases.id"), nullable=False, index=True)
     analysis_types = Column(JSON, nullable=False)
+    input_document_ids_json = Column(JSON, nullable=False, default=list)
+    requirements_json = Column(JSON)
+    actor_id = Column(UuidV4)
+    request_id = Column(String)
     processing_status = Column(enum_type(ProcessingStatus), nullable=False, default=ProcessingStatus.QUEUED)
     progress_percent = Column(Integer, nullable=False, default=0)
     result_json = Column(JSON)
@@ -75,7 +79,8 @@ class AiExecution(Identity, Created, Base):
     job_id = Column(UuidV4, ForeignKey("analysis_jobs.id"))
     case_id = Column(UuidV4, ForeignKey("cases.id"), nullable=False)
     provider = Column(String, nullable=False)
-    model = Column(String, nullable=False)
+    model = Column(String, nullable=True)  # Null when no provider response was received.
+    requested_model = Column(String)
     operation = Column(String, nullable=False)
     prompt_version = Column(String, nullable=False)
     input_document_ids_json = Column(JSON, nullable=False)
@@ -201,6 +206,7 @@ class IdempotencyRecord(Identity, Created, Base):
     request_hash = Column(String(64), nullable=False)
     response_status = Column(Integer, nullable=False)
     response_body = Column(JSON, nullable=False)
+    response_headers = Column(JSON, nullable=False, default=dict)
     __table_args__ = (UniqueConstraint("actor_id", "method", "route", "key"),)
 
 

@@ -72,3 +72,7 @@ PyMuPDF and OpenAI SDK dependencies and backend-only provider/model configuratio
 - [Assurance implementation and QA report](docs/ASSURANCE_QA_REPORT.md), [operational policy and Teguh handoff](docs/ASSURANCE_INTEGRATION.md), and [assurance-only OpenAPI snapshot](docs/openapi.assurance.json). The assurance report/snapshot describe the pre-merge branch; use [dev verification](docs/DEV_MERGE_VERIFICATION.md) and runtime /openapi.json for the integrated state. The foundation documents above describe the earlier baseline.
 
 The foundation is ready for owner handoff; it is not the completed P0 workflow or a full API contract regression pass.
+
+## Teguh backend merge
+
+Prompt A/B backend is merged from teguh 22569a3. Run the explicit `python -m app.core.migrations` upgrade before serving. See [decision handoff](docs/TEGUH_DECISION_HANDOFF.md) and [phase-A handoff](docs/TEGUH_P0_HANDOFF.md). Existing frontend and Simulation/Review/Audit modules are retained. The backend model default remains gpt-6.1-sol as configured on dev.

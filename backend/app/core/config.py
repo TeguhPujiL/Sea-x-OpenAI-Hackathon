@@ -1,7 +1,8 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
-from pydantic import SecretStr, UUID4, model_validator
+from pydantic import Field, SecretStr, UUID4, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -15,6 +16,13 @@ class Settings(BaseSettings):
     demo_display_name: str = "Demo Analyst"
     demo_role: str = "ANALYST"
     demo_scopes: frozenset[str] = frozenset()
+    storage_root: Path = ROOT / ".storage"
+    upload_max_bytes: int = Field(default=10 * 1024 * 1024, ge=1024)
+    pdf_max_pages: int = Field(default=100, ge=1)
+    pdf_max_characters: int = Field(default=500_000, ge=1)
+    ai_max_input_characters: int = Field(default=100_000, ge=1)
+    openai_timeout_seconds: float = Field(default=60.0, gt=0)
+    openai_provider: Literal["openai"] = "openai"
     openai_api_key: SecretStr | None = None
     openai_model: str = "gpt-6.1-sol"
 

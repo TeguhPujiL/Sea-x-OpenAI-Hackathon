@@ -268,15 +268,32 @@ progress::-moz-progress-bar { background: #237c70; }
 .assurance-summary h4 { font-size: 15px; margin: 18px 0 8px; }
 .assurance-summary h5 { font-size: 14px; margin: 0 0 8px; }
 .assurance-summary p, .assurance-summary li { font-size: 13px; line-height: 1.7; }
-.summary-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+.summary-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
 .summary-facts > div { border: 1px solid #dce7e4; border-radius: 7px; padding: 14px; background: #fff; }
 .summary-facts dt { font-size: 11px; color: var(--muted); margin-bottom: 7px; }
 .summary-facts dd { margin: 0; font-size: 16px; font-weight: 600; }
 .summary-scope { padding: 14px 0; border-top: 1px solid #dce7e4; margin-top: 14px; }
-.summary-review { background: #fff; border-left: 3px solid #307f70; padding: 4px 18px 18px; margin: 16px 0; }
-.summary-review blockquote { white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; font-size: 14px; line-height: 1.8; }
 .summary-findings > article { padding: 16px 0; border-top: 1px solid #dce7e4; scroll-margin-top: 20px; }
 .assurance-summary .metrics-table caption { text-align: left; font-size: 12px; padding: 10px 0; }
 .assurance-summary .metrics-table td, .assurance-summary .metrics-table th { overflow-wrap: anywhere; }
 .summary-source { margin-top: 16px; color: var(--muted); font-size: 12px; }
 @media (max-width: 640px) { .assurance-summary { padding: 18px; } .summary-facts { grid-template-columns: 1fr; } }
+
+.vendor-proposal-results { display: grid; gap: 18px; margin: 22px 0; }
+.vendor-proposal-result { background: #fff; border: 1px solid #d6e1df; border-left: 4px solid #8b9d9b; border-radius: 8px; padding: 20px; }
+.vendor-proposal-result .split { gap: 12px; align-items: flex-start; }
+.vendor-proposal-result h4 { margin: 0; overflow-wrap: anywhere; }
+.vendor-result-ready { border-left-color: #307f70; }
+.vendor-result-attention { border-left-color: #af7b23; }
+.proposal-outcome { border-radius: 5px; padding: 5px 8px; font-size: 11px; font-weight: 600; line-height: 1.5; }
+.outcome-ready { background: #e8f3ef; color: #246452; }
+.outcome-attention { background: #fff3d9; color: #795719; }
+.outcome-pending { background: #eef1f3; color: #526572; }
+.proposal-recommendation { background: #f3f7f6; border-radius: 6px; padding: 15px; margin: 15px 0; }
+.proposal-recommendation h5 { line-height: 1.6; }
+.proposal-recommendation ol, .proposal-findings ul { margin: 10px 0 0; padding-left: 20px; }
+.proposal-findings li { margin: 12px 0; }
+.summary-analysis-context { margin: 16px 0; }
+@media (max-width: 640px) { .vendor-proposal-result { padding: 16px; } .vendor-proposal-result .split { flex-direction: column; } }
+
+.history-updated time { font-weight: 600; color: #3e605c; }

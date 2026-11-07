@@ -324,7 +324,7 @@ test("Assure includes the recorded summary above the human review and preserves 
   const resources = { ...emptyResources(), caseResource: caseResource(), job: jobResource("COMPLETED", true) };
   const html = view({ resources, step: 5 });
   assert.match(html, /Assurance summary/);
-  assert.match(html, /Vendor requirement compliance: not determined/);
+  assert.match(html, /Vendor proposal recommendations/);
   assert.match(html, /Clean-case completion pending contract decision/);
   assert.doesNotMatch(view({ resources, step: 0 }), /id="assurance-summary-title"/);
 });

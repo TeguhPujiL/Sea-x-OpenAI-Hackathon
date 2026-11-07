@@ -1,12 +1,5 @@
-import type { DocumentResource, FindingResource, ReviewDecision } from "./contracts";
+import type { DocumentResource, FindingResource } from "./contracts";
 import type { Resources } from "./workflow";
-
-export const reviewLabels: Record<ReviewDecision, string> = {
-  APPROVE_DRAFT: "Repair draft approved",
-  REQUEST_REVISION: "Revision requested",
-  REQUEST_EVIDENCE: "More evidence requested",
-  REJECT_DRAFT: "Repair draft rejected",
-};
 
 // Read-only projection of recorded resources. No new compliance verdict is inferred.
 export function assuranceSummary(resources: Resources) {
@@ -37,25 +30,93 @@ export function assuranceSummary(resources: Resources) {
   } else if (reliable && result) {
     headline = result.finding_ids.length ? "Integrity findings recorded" : "No integrity findings returned";
     narrative = result.finding_ids.length
-      ? "The analysis returned integrity findings. Review their evidence and the recorded human decision below."
+      ? "The analysis returned integrity findings. Review the findings and the recommendations for each proposal below."
       : "The completed analysis returned no integrity findings for the documents it analyzed.";
   }
   const relatedFindings = (document: DocumentResource): FindingResource[] => findings.filter(f => f.evidence.some(e => e.document_id === document.document_id));
+  const quotationIds = new Set(documents.filter(d => d.document_type === "SUPPLIER_QUOTATION").map(d => d.document_id));
+  const open = (finding: FindingResource) => !["RESOLVED", "DISMISSED"].includes(finding.status);
+  const sharedFindings = findings.filter(f => !f.evidence.some(e => quotationIds.has(e.document_id)));
+  const comparisonInputs = ["TOR", "TECHNICAL_SPECIFICATION"].every(type => documents.some(d => d.document_type === type && execution?.input_document_ids.includes(d.document_id)));
   const proposals = documents.filter(d => d.document_type === "SUPPLIER_QUOTATION").map(document => {
     const included = !!execution?.input_document_ids.includes(document.document_id);
     const related = included ? relatedFindings(document) : [];
-    const coverage = !included ? "Not included in this analysis"
+    const shared = included ? sharedFindings : [];
+    const coverage = !execution ? job ? "Analysis coverage not yet reported" : "Not analyzed" : !included ? "Not included in this analysis"
       : job?.status === "QUEUED" || job?.status === "PROCESSING" ? "Analysis in progress"
       : job?.status === "FAILED" ? "Analysis failed"
       : !reliable ? "Evidence review required"
       : related.length ? "Included; see recorded findings" : "Included; no finding cites this proposal";
-    return { document, coverage, findings: related };
+    let status = "Not assessed";
+    let tone: "ready" | "attention" | "pending" = "pending";
+    let resultSummary = "This proposal has not been included in a completed analysis.";
+    let recommendation = "Analyze this proposal";
+    let nextSteps = ["Include this supplier quotation, the TOR and the technical specification in a new analysis."];
+    if (document.processing_status === "FAILED") {
+      status = "Document extraction failed";
+      resultSummary = "The proposal could not be read successfully.";
+      recommendation = "Provide a readable proposal";
+      nextSteps = ["Upload a readable PDF, save its document type as Supplier quotation, and run a new analysis."];
+    } else if (document.processing_status !== "COMPLETED") {
+      status = "Document processing incomplete";
+      resultSummary = "The proposal document is not ready for assessment.";
+      recommendation = "Complete document processing";
+      nextSteps = ["Check the document processing status in Upload before starting a new analysis."];
+    } else if ((included || !execution) && (job?.status === "QUEUED" || job?.status === "PROCESSING")) {
+      status = "Analysis in progress";
+      resultSummary = included ? "This proposal is included in the running analysis. A result is not available yet." : "The case analysis is running. Coverage for this proposal is not yet reported.";
+      recommendation = "Wait for the analysis result";
+      nextSteps = ["Return to Assess to monitor the current analysis, then refresh these recommendations."];
+    } else if ((included || !execution) && job?.status === "FAILED") {
+      status = "Analysis failed";
+      resultSummary = "The case analysis failed. An assessment of this proposal cannot be confirmed.";
+      recommendation = "Resolve the analysis error";
+      nextSteps = ["Check the execution error in Assess and address its cause before running a new analysis."];
+    } else if (job && !execution) {
+      status = "Analysis coverage unavailable";
+      tone = "attention";
+      resultSummary = "The execution record does not confirm that this proposal was assessed.";
+      recommendation = "Confirm analysis coverage";
+      nextSteps = ["Refresh the analysis records. If coverage remains unavailable, run a new analysis that includes this proposal and the requirement documents."];
+    } else if (included && !reliable) {
+      status = "Evidence checks required";
+      tone = "attention";
+      resultSummary = "The available analysis has incomplete evidence checks, warnings or missing finding details.";
+      recommendation = "Verify the evidence before deciding";
+      nextSteps = ["Review the processing warnings and cited source pages in Assess.", "Refresh missing records and rerun the analysis if the source documents change."];
+    } else if (included && related.some(open)) {
+      status = "Clarification needed";
+      tone = "attention";
+      resultSummary = "This proposal is cited in findings that are still open or under review.";
+      recommendation = "Request clarification from this vendor";
+      nextSteps = ["Ask the vendor to respond to the findings below and provide evidence for the cited requirements.", "Compare the response with the TOR and technical specification before deciding whether to proceed."];
+    } else if (included && shared.some(open)) {
+      status = "Evaluation basis needs clarification";
+      tone = "attention";
+      resultSummary = "No open finding directly cites this proposal, but unresolved case findings may affect its evaluation.";
+      recommendation = "Clarify the evaluation basis";
+      nextSteps = ["Review the shared findings below and resolve the affected requirements or evidence before the final comparison."];
+    } else if (included && (!comparisonInputs || requirementCount === null || requirementCount === 0)) {
+      status = "Requirement coverage needs confirmation";
+      tone = "attention";
+      resultSummary = "The recorded result does not establish an extracted requirement baseline for this proposal.";
+      recommendation = "Confirm the requirement baseline";
+      nextSteps = ["Check that the TOR and technical specification were included and that requirements were extracted.", "Run a new analysis with the complete source documents before making a compliance decision."];
+    } else if (included && related.length) {
+      status = "Recorded findings closed";
+      tone = "ready";
+      resultSummary = "The findings citing this proposal are recorded as resolved or dismissed.";
+      recommendation = "Review resolutions, then continue evaluation";
+      nextSteps = ["Read the recorded resolution or dismissal notes and supporting evidence.", "Confirm every mandatory requirement and the proposal's commercial terms before final selection."];
+    } else if (included) {
+      status = "No recorded issues";
+      tone = "ready";
+      resultSummary = "No returned integrity finding directly cites this proposal in the completed analysis.";
+      recommendation = "Continue with detailed evaluation";
+      nextSteps = ["Confirm each mandatory technical requirement against the proposal and its supporting documents.", "Check delivery, warranty and commercial terms, then compare the eligible proposals and document your decision."];
+    }
+    return { document, coverage, findings: related, sharedFindings: shared, status, tone, resultSummary, recommendation, nextSteps };
   });
-  // An approval of a correction is scoped to that repair, not every vendor.
-  const repair = resources.repair;
-  const review = repair && repair.case_id === caseId && findings.some(f => f.finding_id === repair.finding_id)
-    ? resources.reviews.filter(v => v.case_id === caseId && v.repair_proposal_id === repair.repair_proposal_id)
-      .sort((a,b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] ?? null : null;
   return { caseResource, job, documents, headline, narrative, requirementCount, findingCount: result?.finding_ids.length ?? null,
-    findings, missingFindings, proposals, review };
+    findings, missingFindings, proposals };
 }

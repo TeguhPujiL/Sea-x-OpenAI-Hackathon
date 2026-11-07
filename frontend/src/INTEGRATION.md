@@ -146,7 +146,7 @@ calls with no returned model/usage now show their real error instead of a client
 shape error; malformed non-null values still fail validation. The model name is
 never fabricated from the configured requested model.
 
-History defaults to newest created_at first and five cases per page, with category,
+History defaults to updated_at descending and five cases per page, with category,
 text and recently-opened filters. Filter changes reset the page. Pagination clamps
 when fewer results remain. Category options come from authorized backend cases;
 filtering/pagination are client-side over the existing paginated GET /cases data,
@@ -170,29 +170,43 @@ if it was active. No new backend route or shared schema is introduced. Server
 scope/access checks, active-analysis/review protections and soft deletion apply.
 
 
-## Assure summary from existing records
+## Vendor proposal summaries and recommendations
 
-Assure now starts with a read-only summary of the loaded analysis and human review:
-analysis state, server-returned requirement/finding counts, supplier quotation
-coverage, finding links with page-addressable evidence, processing warnings, and
-the selected correction's reviewer conclusion verbatim. The projection is in
-assuranceSummaryData.ts and rendered by AssuranceSummary.tsx.
+Assure starts with a card for each active SUPPLIER_QUOTATION document. Every card
+shows its recorded analysis coverage, result, recommendation and actionable next
+steps. Open findings citing that proposal lead to a clarification recommendation;
+unresolved findings without a vendor reference are shown as shared case context.
+A finding on one proposal is not attributed to another vendor. Closed findings
+recommend checking the recorded resolution before continuing evaluation. Proposals
+with no recorded issues receive next steps for detailed technical/commercial
+evaluation. Filenames identify proposal documents; vendor identities are not
+inferred or merged from filenames.
 
-Proposal rows come only from active case documents typed SUPPLIER_QUOTATION.
-Membership in ai_execution.input_document_ids establishes analysis coverage;
-uploading a proposal later does not make it assessed. Only findings referenced by
-the current job and reviews matching its selected repair are included. Missing
-findings, failed checks, warnings and NEEDS_REVIEW prevent a clean conclusion.
-Missing counts stay unavailable, rather than becoming zero.
+Unassessed proposals, failed/pending analysis, absent execution metadata, evidence
+warnings, incomplete finding lists and absent requirement baseline each produce
+an appropriate prerequisite action. No positive compliance verdict is inferred.
+Requirements and finding counts remain analysis-wide context, not per-vendor
+satisfaction counts. Supporting evidence retains its document/page provenance.
 
-No additional AI call, new API field, review decision or persistence table is
-introduced. Refresh and history reopening rebuild the summary from authorized
-server records. The existing result does not contain per-requirement vendor
-compliance verdicts; the UI states this limitation and never interprets no findings
-or APPROVE_DRAFT as vendor compliance. Human conclusions remain attributed to
-the recorded reviewer. The G01 clean-case completion gap remains visible.
+Human review information has been removed from this summary. The separate formal
+review controls, immutable decisions and audit timeline remain unchanged. No new
+AI request, public schema field, API route or persistence table is introduced.
+History reopening and refresh rebuild these recommendations from server records.
+The clean-case completion gap remains visible.
 
-Executed frontend verification: 63 Node tests passed, including clean/failed/
-processing/NEEDS_REVIEW, unassessed quotations, source evidence, missing counts,
-cross-case/history filtering and reviewer decision attribution. Typecheck and
-production build passed. No new live AI evaluation was performed.
+Case history shows each case's server updated_at timestamp in local display time
+with UTC retained in the time element. Sorting uses updated_at descending, then
+created_at and ID for stable ties, before the existing filters/pagination slice.
+Recently opened IDs do not override update ordering. Five-case pagination and
+category/search/recent filters are retained.
+
+The browser favicon uses public/favicon.svg, matching the existing ProcureMind
+P/ascending-arrow brand mark and colors. Vite copies it into the Docker static
+build; index.html links it for both the login page and case workspace.
+
+
+Executed verification for this update: 70 frontend Node tests passed; TypeScript
+and Vite production build passed. Docker rebuilt and became healthy. HTTP checks
+verified the favicon link/SVG response, deployed recommendation/history assets,
+authorized case timestamps and logout. The existing synthetic persistence check
+also passed. No extra live AI call or interactive visual browser check was made.

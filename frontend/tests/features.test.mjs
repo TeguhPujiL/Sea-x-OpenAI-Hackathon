@@ -107,7 +107,7 @@ function historyCases() {
   return Array.from({ length: 12 }, (_, index) => ({ ...caseResource(), case_id: crypto.randomUUID(), title: `History ${index}`,
     category: index % 2 ? "SERVICES" : "IT_EQUIPMENT", created_at: new Date(Date.UTC(2026,10,7,0,index)).toISOString() }));
 }
-test("case history paginates five newest cases without gaps or duplicates", () => {
+test("case history paginates five most recently updated cases without gaps or duplicates", () => {
   const cases = historyCases();
   const options = { query: "", category: "", recentOnly: false, page: 1 };
   const first = caseHistoryPage(cases, [cases[0].case_id], options);
@@ -164,4 +164,29 @@ test("type save rejects cross-case responses before adopting server data", async
   const client = createClient(config, async () => Response.json(envelope({ ...a, case_id: IDs.actor, document_type: "TOR", version: 2 })));
   await assert.rejects(saveDocumentTypes(client, [a], { [a.document_id]: "TOR" }, () => { saved = true; }, new AbortController().signal), /identity/);
   assert.equal(saved, false);
+});
+
+
+test("case history sorts an older case updated now ahead of newer-created cases before pagination", () => {
+  const cases = historyCases();
+  cases[0].created_at = "2026-01-01T00:00:00Z";
+  cases[0].updated_at = "2026-11-07T12:30:00Z";
+  cases[1].updated_at = "2026-11-07T12:00:00Z";
+  const options = { query: "", category: "", recentOnly: false, page: 1 };
+  const page = caseHistoryPage(cases, [cases[11].case_id], options);
+  assert.equal(page.items[0].case_id, cases[0].case_id);
+  assert.equal(page.items[1].case_id, cases[1].case_id);
+  assert.equal(page.items.length, 5);
+  assert.equal(caseHistoryPage(cases, [], { ...options, category: "IT_EQUIPMENT" }).items[0].case_id, cases[0].case_id);
+  const all = [1,2,3].flatMap(value => caseHistoryPage(cases, [], { ...options, page: value }).items);
+  assert.equal(new Set(all.map(c => c.case_id)).size, cases.length);
+});
+test("each history row shows the server update timestamp with a machine-readable UTC value", () => {
+  const cases = historyCases();
+  const html = renderToStaticMarkup(React.createElement(CaseHistory, { cases, recentIds: [], activeId: null,
+    loading: false, error: null, disabled: false, onOpen: noop, onDelete: noop, onRefresh: noop, onClose: noop }));
+  assert.equal((html.match(/Last updated:/g) ?? []).length, 5);
+  assert.equal((html.match(/<time dateTime="/g) ?? []).length, 5);
+  assert.ok(html.includes(`dateTime="${cases[11].updated_at}"`));
+  assert.match(html, /Most recently updated cases appear first/);
 });

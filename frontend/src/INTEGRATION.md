@@ -109,9 +109,9 @@ actor, scopes and case membership; it does not implement production OIDC or
 multi-user account administration. These operational endpoints require integration
 owner review before deployment; no business response/schema/enum was changed.
 
-Case history uses the existing authorized GET /cases endpoint, with a search and
+Case history uses the existing authorized GET /cases endpoint, with search, category filtering, five-case pagination and a
 reopen action. Reopening loads documents, the latest analysis, findings and any
-available audit history from the server. Recent ordering stores at most 50 UUIDs
+available audit history from the server. Recent browsing history stores at most 50 UUIDs
 in localStorage, with no case titles, document content, cached results or reviewer
 identity. Active-workspace recovery continues to store only resource identifiers
 in sessionStorage. History can be filtered to recently opened cases; all currently
@@ -137,3 +137,17 @@ storage, batch partial failure, transport retry keys, UI controls and credential
 masking. Visual browser verification was unavailable because the local-origin
 browser permission was declined; automated API, rendered markup and build checks
 are reported separately.
+
+
+## Assess and history follow-up
+
+AI execution model is nullable, matching the backend ExecutionView. Failed provider
+calls with no returned model/usage now show their real error instead of a client
+shape error; malformed non-null values still fail validation. The model name is
+never fabricated from the configured requested model.
+
+History defaults to newest created_at first and five cases per page, with category,
+text and recently-opened filters. Filter changes reset the page. Pagination clamps
+when fewer results remain. Category options come from authorized backend cases;
+filtering/pagination are client-side over the existing paginated GET /cases data,
+without adding unsupported API query fields or caching case content locally.

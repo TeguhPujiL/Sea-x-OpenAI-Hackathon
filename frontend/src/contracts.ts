@@ -23,7 +23,7 @@ export interface DocumentResource {
   version: number; uploaded_at: string; deleted_at: string | null;
 }
 export interface AiExecution {
-  execution_id: string; provider: string; model: string; operation: string; prompt_version: string;
+  execution_id: string; provider: string; model: string | null; operation: string; prompt_version: string;
   input_document_ids: string[]; schema_valid: boolean; evidence_validation_passed: boolean;
   evidence_checks: { checked: number; passed: number; failed: number }; latency_ms: number;
   usage: { input_tokens: number; output_tokens: number } | null;
@@ -114,7 +114,7 @@ export const decodeCase = decode<CaseResource>("case", { ...versioned, case_numb
 export const decodeDocument = decode<DocumentResource>("document", { document_id: uuid, case_id: uuid, filename: text, document_type: oneOf(documentTypes), description: nullable(text), mime_type: oneOf(["application/pdf"]), size_bytes: v => integer(v, 1), sha256: v => typeof v === "string" && /^[a-f0-9]{64}$/i.test(v), page_count: v => integer(v, 1), processing_status: oneOf(statuses), version, uploaded_at: utc, deleted_at: nullable(utc) });
 const nestedError = recordCheck({ code: text, message: text, retryable: bool });
 export const decodeJob = decode<JobResource>("job", { ...resource, job_id: uuid, job_type: text, status: oneOf(statuses), progress_percent: v => typeof v === "number" && v >= 0 && v <= 100,
-  ai_execution: nullable(recordCheck({ execution_id: uuid, provider: text, model: text, operation: text, prompt_version: text, input_document_ids: array(uuid), schema_valid: bool, evidence_validation_passed: bool, evidence_checks: recordCheck({ checked: v => integer(v), passed: v => integer(v), failed: v => integer(v) }), latency_ms: v => integer(v), usage: nullable(recordCheck({ input_tokens: v => integer(v), output_tokens: v => integer(v) })) })),
+  ai_execution: nullable(recordCheck({ execution_id: uuid, provider: text, model: nullable(text), operation: text, prompt_version: text, input_document_ids: array(uuid), schema_valid: bool, evidence_validation_passed: bool, evidence_checks: recordCheck({ checked: v => integer(v), passed: v => integer(v), failed: v => integer(v) }), latency_ms: v => integer(v), usage: nullable(recordCheck({ input_tokens: v => integer(v), output_tokens: v => integer(v) })) })),
   result: nullable(recordCheck({ finding_ids: array(uuid) })), warnings: array(recordCheck({ code: text, message: text })), error: nullable(nestedError), started_at: nullable(utc), completed_at: nullable(utc)
 }, v => v.status === "COMPLETED" || v.status === "NEEDS_REVIEW" ? v.result !== null : v.result === null);
 export const decodeFinding = decode<FindingResource>("finding", { ...versioned, finding_id: uuid, analysis_job_id: uuid, ai_execution_id: uuid, type: text, severity: oneOf(["LOW", "MEDIUM", "HIGH", "CRITICAL"]), status: oneOf(["OPEN", "UNDER_REVIEW", "RESOLVED", "DISMISSED"]), title: text, summary: text, confidence: v => typeof v === "number" && v >= 0 && v <= 1, evidence_status: oneOf(evidenceStatuses), evidence: array(recordCheck({ document_id: uuid, page_number: v => integer(v, 1), excerpt: text, verification_status: oneOf(evidenceStatuses) })), assignee_id: nullable(uuid), resolution_note: nullable(text) });

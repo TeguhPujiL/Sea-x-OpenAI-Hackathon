@@ -253,3 +253,19 @@ test("uploaded documents expose removal while active analysis disables it", () =
   const busy = view({ resources, ids: fullIds(), step: 0 });
   assert.match(busy, /disabled=""[^>]*aria-label="Remove test-tor.pdf"/);
 });
+
+
+test("failed analysis with no provider response retains null model and original error", () => {
+  const job = { ...jobResource("FAILED"), error: { code: "AI_PROVIDER_ERROR", message: "AI provider is unavailable", retryable: false },
+    ai_execution: { ...jobResource().ai_execution, model: null, usage: null, schema_valid: false,
+      evidence_validation_passed: false, evidence_checks: { checked: 0, passed: 0, failed: 0 } } };
+  assert.equal(decodeJob(job).ai_execution.model, null);
+  const html = view({ resources: { ...emptyResources(), job }, step: 1 });
+  assert.match(html, /AI_PROVIDER_ERROR/);
+  assert.match(html, /No model response received/);
+  assert.doesNotMatch(html, /Unable to continue/);
+  for (const model of [42, true, {}, [], undefined]) {
+    assert.throws(() => decodeJob({ ...job, ai_execution: { ...job.ai_execution, model } }), ShapeError);
+  }
+  assert.equal(decodeJob(jobResource()).ai_execution.model, "synthetic-test-model");
+});

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readCaseHistory, rememberCase, orderCases, caseHistoryKey } from "../src/history.ts";
+import { readCaseHistory, rememberCase, orderCases, caseHistoryPage, caseHistoryKey } from "../src/history.ts";
 import { newUploadItems, uploadBatch } from "../src/uploads.ts";
 import { CaseHistory } from "../src/CaseHistory.tsx";
 import { DocumentUploads, DocumentTypeEditor } from "../src/DocumentUploads.tsx";
@@ -99,4 +99,38 @@ test("reopening case history restores recorded simulation, repair, review and au
   assert.equal(restored.resources.reviews.length, 1);
   assert.equal(restored.resources.audit.length, 1);
   assert.equal(recoveredStep(restored.resources), 5);
+});
+
+
+function historyCases() {
+  return Array.from({ length: 12 }, (_, index) => ({ ...caseResource(), case_id: crypto.randomUUID(), title: `History ${index}`,
+    category: index % 2 ? "SERVICES" : "IT_EQUIPMENT", created_at: new Date(Date.UTC(2026,10,7,0,index)).toISOString() }));
+}
+test("case history paginates five newest cases without gaps or duplicates", () => {
+  const cases = historyCases();
+  const options = { query: "", category: "", recentOnly: false, page: 1 };
+  const first = caseHistoryPage(cases, [cases[0].case_id], options);
+  const second = caseHistoryPage(cases, [], { ...options, page: 2 });
+  const third = caseHistoryPage(cases, [], { ...options, page: 3 });
+  assert.deepEqual([first.items.length, second.items.length, third.items.length], [5,5,2]);
+  assert.equal(first.items[0].title, "History 11");
+  assert.equal(first.pages, 3);
+  assert.equal(new Set([...first.items, ...second.items, ...third.items].map(c => c.case_id)).size, 12);
+});
+test("category, search and recently opened filters combine and clamp pagination", () => {
+  const cases = historyCases();
+  const options = { query: "", category: "SERVICES", recentOnly: false, page: 99 };
+  const filtered = caseHistoryPage(cases, [], options);
+  assert.equal(filtered.total, 6); assert.equal(filtered.page, 2); assert.equal(filtered.items.length, 1);
+  const recent = caseHistoryPage(cases, [cases[1].case_id, cases[2].case_id], { ...options, recentOnly: true });
+  assert.equal(recent.total, 1); assert.equal(recent.page, 1); assert.equal(recent.items[0].case_id, cases[1].case_id);
+  const empty = caseHistoryPage(cases, [], { ...options, query: "no-such-case" });
+  assert.equal(empty.total, 0); assert.equal(empty.page, 1);
+});
+test("case history renders category options, page controls and only five rows", () => {
+  const html = renderToStaticMarkup(React.createElement(CaseHistory, { cases: historyCases(), recentIds: [], activeId: null,
+    loading: false, error: null, disabled: false, onOpen: noop, onRefresh: noop, onClose: noop }));
+  assert.match(html, /All categories/); assert.match(html, /value="SERVICES"/);
+  assert.match(html, /Page 1 of 3/); assert.match(html, /Next/);
+  assert.equal((html.match(/>Open case<\/button>/g) ?? []).length, 5);
 });

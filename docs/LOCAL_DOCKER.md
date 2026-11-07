@@ -47,7 +47,7 @@ do not use that option for a database you want to keep.
 
 ## Test the UI
 
-1. Sign in, create a case, then open **Case history** to search/reopen it.
+1. Sign in, create a case, then open **Case history** to search/reopen it. Filter by Category and use Previous/Next to browse five newest-first cases per page.
 2. Select several PDFs and choose **Upload selected PDFs**. Each file uses its
    own existing upload endpoint and idempotency key. Partial failures are shown
    separately; retry skips successful files.
@@ -95,3 +95,22 @@ python scripts/docker_smoke.py verify
 This creates a labelled synthetic case in the local volume. It neither runs AI
 nor deletes other cases. Automated API/build tests were run; interactive visual
 browser verification was not performed.
+
+## Assess: provider failure versus frontend validation
+
+An execution's `model` is null when no model response was received. The frontend
+accepts that backend schema and shows the original job error; it does not replace
+an absent runtime model with a requested model name. Missing/malformed fields
+remain errors. A regression covers FAILED/AI_PROVIDER_ERROR with null model/usage.
+
+If the container has no AI credentials, analysis correctly remains FAILED with
+AI_PROVIDER_ERROR. Configure a valid, newly issued PROCUREMIND_OPENAI_API_KEY and
+an available PROCUREMIND_OPENAI_MODEL in the ignored root .env. Do not paste keys
+into chat or commit them. Recreate the container to load changed environment:
+
+```sh
+docker compose up -d --force-recreate
+```
+
+Sign in again and choose Run new analysis. Historical failed executions remain
+immutable; a new request creates a new job rather than changing the old result.

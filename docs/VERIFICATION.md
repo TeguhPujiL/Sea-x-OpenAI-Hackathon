@@ -1,3 +1,5 @@
+> Dev integration status: [DEV_MERGE_VERIFICATION.md](DEV_MERGE_VERIFICATION.md). The 100-test Teguh suite and frontend typecheck pass; combined Assurance fixtures still have a migration mismatch. The owned-scope report below is not a full dev release gate.
+
 # Teguh Prompt A + Prompt B verification
 
 Current scope: 28 Teguh business operations (case/document/analysis/job/finding/challenge/repair) plus health. Prompt A's 59-test baseline remains covered. Simulation, Review/Audit routes/services and frontend remain separate owner work.

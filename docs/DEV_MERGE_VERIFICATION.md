@@ -1,3 +1,19 @@
+# Current dev merge: Teguh 22569a3 into dev 2e38296
+
+All 36 business operations plus health register. Current schema: openapi.dev.json. Frontend and teammate Simulation/Review/Audit modules are preserved; dev model default gpt-6.1-sol remains. The merge composes all routers and preserves owner-defined 422 errors while replacing only FastAPI default validation schemas.
+
+Executed verification:
+
+- Teguh tests: 100 passed; one existing Starlette/httpx warning.
+- Foundation/OpenAPI focused checks: 15 passed again after the final metadata correction.
+- Frontend npm run typecheck: passed.
+- Full backend suite: NOT PASSING; stopped after three Assurance fixture setup errors. Its migration creates an older analysis_jobs table without input_document_ids_json required by the merged models.
+- The final metadata assertion detected a missing simulation 422 response; fixed the OpenAPI filter to preserve all explicitly supplied error schemas.
+
+Pending integration: coordinate Assurance checksum migrations with core migration 0002, finalize seeded jobs only after results exist, and align case-access adapters. No immutable guard, simulator calculation or assurance decision rule was relaxed. This is an integration merge, not a full release or live OpenAI validation claim.
+
+## Previous dev verification
+
 # Fauzan into dev: integration verification
 
 Date: 7 November 2026 (Asia/Jakarta). Requested direction: fauzan -> dev.

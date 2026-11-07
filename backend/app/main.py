@@ -3,7 +3,6 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.openapi.utils import get_openapi
-from fastapi.routing import APIRoute
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 
@@ -88,10 +87,10 @@ def create_app(settings: Settings | None = None, *, simulation_lookup: Simulatio
         if app.openapi_schema is None:
             from app.schemas.shared import Envelope
             schema = get_openapi(title=app.title, version=app.version, description=app.description, routes=app.routes)
-            explicit_422 = {(r.path, m.lower()) for r in app.routes if isinstance(r, APIRoute) and (422 in r.responses or "422" in r.responses) for m in r.methods}
             for path, methods in schema["paths"].items():
                 for method, operation in methods.items():
-                    if "422" in operation.get("responses", {}) and (path, method) not in explicit_422:
+                    validation_ref = operation.get("responses", {}).get("422", {}).get("content", {}).get("application/json", {}).get("schema", {}).get("$ref")
+                    if validation_ref == "#/components/schemas/HTTPValidationError":
                         operation["responses"].pop("422")
                     for status, description in ((400, "Validation error"), (401, "Authentication required"), (403, "Forbidden"), (404, "Resource not found"), (409, "Version/state/idempotency conflict"), (500, "Internal error")):
                         operation["responses"].setdefault(str(status), {"description": description,

@@ -5,3 +5,4 @@ __all__ = ['Base', 'Case', 'Document', 'DocumentPage', 'AnalysisJob', 'AiExecuti
 
 from app.models.access import CaseAccess
 from app.models import integrity  # Register ORM guards.
+from app.models.decisions import GenerationLease, SubmittedRepairSnapshot

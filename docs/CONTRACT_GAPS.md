@@ -31,7 +31,7 @@ Status: **OPEN / PROPOSED CLARIFICATION**.
 
 Page 19 shows AI_ASSISTED creation returning READY and human_edits=false, while its contract note says AI output remains a draft until a human marks it READY. Section 4.2 permits DRAFT/READY edits but does not resolve the initial-state conflict.
 
-PROPOSED: return DRAFT for newly generated AI content and use versioned human PATCH to mark READY. This is not silently adopted; the owner must obtain an explicit clarification before freezing this behavior.
+Current conservative implementation returns DRAFT for AI content and uses a human versioned PATCH to mark READY, following page 19's explicit note and Section 6's illustrative-value rule. PROPOSED clarification: align the READY response example with the human-readiness note. This remains an open discrepancy, not a new enum or hidden approval path.
 
 ## G04 - Signed money delta versus global rule
 
@@ -83,9 +83,9 @@ PROPOSED: document concrete operational policies with Teguh/owners, escalating a
 
 Status: **OWNED P0 IMPLEMENTED / INTEGRATION PENDING**.
 
-Case/document/analysis/job/finding routes and their storage, AI, ACL, idempotency and atomic audit paths are implemented. Challenge/repair and teammate services remain outside this task. The branch's generated schema is openapi.teguh-p0.json; the original foundation snapshot is historical. Live OpenAI inference, production OIDC, integrated frontend, simulation and assurance workflows still require owner validation.
+All 28 Teguh case/document/analysis/job/finding/challenge/repair operations and their storage, AI, ACL, idempotency and delegated atomic audit paths are implemented. Simulation and Review/Audit owner services remain separate. The branch's generated schema is openapi.teguh-p0.json; the original foundation snapshot is historical. Live OpenAI inference, production OIDC, integrated frontend, simulation and assurance workflows still require owner validation.
 
-Migration 0001 is explicit, row-preserving, checks foreign keys and installs source/job integrity guards. It is an MVP SQLite migration runner, not a full production migration framework. Legacy actor/input provenance is not fabricated. See TEGUH_P0_HANDOFF.md.
+The explicit migration runner supports 0001/0002, preserves rows, checks foreign keys and installs source/job/decision integrity guards. It is an MVP SQLite migration runner, not a full production migration framework. Legacy actor/input provenance is not fabricated. See TEGUH_P0_HANDOFF.md.
 
 ## G11 - PROPOSED foundation operational defaults
 
@@ -108,3 +108,16 @@ Nonterminal startup recovery is for single-worker deployments only. Interrupted 
 Runtime model is null when no provider response exists; requested_model is retained internally and never returned as measured runtime provenance. Internal structured-output schema procurement-analysis-v1 adds no public request fields. Event vocabulary for owned material writes is recorded by the core integration writer without adding a closed audit enum or changing Fazhima's service/router.
 
 Finding RESOLVED is conservatively rejected until its disposition-evidence input is clarified; rationale-bearing dismissals are implemented. These policies are explicit, not silently elevated to contract clauses. Wire shape/status or enum corrections still require approved versioned revisions.
+
+
+## G13 - PROPOSED decision-generation and integration policies
+
+Status: **OPEN / PROPOSED IMPLEMENTATION DECISIONS**.
+
+Challenge AI remains DRAFT until human readiness. Internal decision schemas use citations without adding public response fields. before_text must match VERIFIED finding evidence; unsupported language, numbers and citations fail rather than being silently repaired. Numeric interpretation is rendered from immutable simulation values, not model calculations. Conservative English lexical/number guards can reject benign text and do not establish semantic correctness.
+
+Repair idempotency uses actor/POST-route/key leases with expiry provider-timeout + 30 seconds. In-flight same-key requests return 409 INVALID_STATE_TRANSITION; completed attempt responses replay status/body and provider Retry-After when present. New keys create new deliberate generations. Exactly-once external billing across crashes/lease expiry is not promised. All provider attempts and new resources use delegated AuditService within the caller transaction; audit failure rolls the transaction back and may leave a lease until expiry.
+
+Submission creates an immutable versioned snapshot and moves the case to UNDER_REVIEW/READY_FOR_REVIEW, not final approval. The frontend must refresh case.version. Review owners retain their own scope/decision/assurance logic; the exported precondition adapter is read-only. Legacy submitted rows without snapshots fail closed rather than inventing history.
+
+No downstream v1.1 create request has a challenge FK. The default reference lookup honors explicit stored challenge references; integrators adding other links must extend the typed ReferenceLookup. Challenge PATCH fields are question/status/expected_version; repair PATCH fields are proposed_text/status/expected_version as shown in Section 6 examples. Any broader field set or changed wire semantics needs an approved versioned clarification.

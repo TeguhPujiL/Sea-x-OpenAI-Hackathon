@@ -1,48 +1,56 @@
-# ProcureMind V4.1 - Teguh P0 backend
+# ProcureMind V4.1 - Teguh backend
 
-Implemented: cases, protected PDF upload/page extraction, asynchronous AI analysis jobs/retries and evidence-linked findings with versioned triage/dismissal. API Contract v1.1 Section 2.3 controls. Wire fields remain type/evidence, job status and expected_version as specified. Simulation and Review/Audit services/routes are not changed; challenge/repair remain skeletons.
+Prompt A and Prompt B are implemented: **28 owned business operations** for case, PDF document, analysis/job, finding, challenge and AI repair, plus health. API Contract v1.1 Section 2.3 controls. Simulation calculations and Review/Audit decision/read routes remain teammate-owned.
 
-## Install and migrate
+## Install, migrate and run
 
 From the repository root in PowerShell (Python 3.11+):
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e "./backend[test]"
-Copy-Item .env.example .env
-# Edit .env: configure trusted demo identity/scopes, API key and model.
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+# Edit .env: configure trusted demo identity/scopes and an authorized OpenAI key/model.
 .\.venv\Scripts\python.exe -m app.core.migrations
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir backend --reload
 ```
 
-Back up any existing SQLite file before migration. The versioned migration preserves previous rows, adds membership/job provenance, relaxes unavailable runtime-model storage to null and reinstalls integrity guards. Legacy actor/input provenance is never guessed. Startup does not migrate or create tables automatically. Relative paths resolve from the repository root. Do not run multiple Uvicorn workers: the MVP startup recovery marks interrupted nonterminal jobs FAILED for explicit retry.
+Back up an existing DB first. Migration **0002 / user_version=2** preserves Prompt A rows/cache bodies, adds generation leases and immutable submitted-repair snapshots, and retains cached Retry-After headers. Startup does not create or migrate tables. Existing submitted rows without snapshots fail review preconditions until a reviewed backfill is provided. Run from the repository root because relative DB/storage paths resolve there. The MVP uses one Uvicorn worker; Prompt A startup recovery is not a production queue.
 
-## Backend configuration
+Health: http://127.0.0.1:8000/api/v1/health. OpenAPI: http://127.0.0.1:8000/openapi.json. Interactive docs: http://127.0.0.1:8000/docs.
 
-Demo identity is off by default. For a hackathon run, set PROCUREMIND_DEMO_MODE=true, generate a UUID v4 with `python -c "from uuid import uuid4; print(uuid4())"`, set PROCUREMIND_DEMO_ACTOR_ID, and grant only required PROCUREMIND_DEMO_SCOPES from .env.example. Identity is backend-controlled; no browser actor/reviewer field is trusted. Role alone does not grant scopes. API access also requires case membership; case creation grants it only to the creator.
+## Trusted backend configuration
 
-Set PROCUREMIND_OPENAI_API_KEY and PROCUREMIND_OPENAI_MODEL to an authorized model supporting strict Structured Outputs; provider is openai. Missing configuration creates a visible FAILED job, never a fake finding. No live AI request has been claimed as tested. Never commit .env, stored PDFs, API keys or raw provider output. The frontend owner must label demo identity visibly.
+Demo identity is disabled by default. Set PROCUREMIND_DEMO_MODE=true, generate a UUID v4 using `python -c "from uuid import uuid4; print(uuid4())"`, configure PROCUREMIND_DEMO_ACTOR_ID and explicitly grant only needed scopes from .env.example. Prompt B requires challenge:read/write/delete and repair:read/write/delete as appropriate. Role alone grants no scopes. Both API scope and backend-managed case membership are required; browser-supplied identity is never authoritative. The integrated UI must label demo mode.
 
-Storage defaults to .storage with generated UUID filenames and no download/static route. Upload, page, text, AI input and timeout limits are explicit configuration values. These operational defaults are PROPOSED and documented; they are not invented contract constants.
+Set PROCUREMIND_OPENAI_API_KEY and PROCUREMIND_OPENAI_MODEL to an authorized model supporting strict Structured Outputs. Never commit secrets or PDFs. There is no canned AI fallback. Missing provider configuration produces an explicit failure. Live OpenAI inference/generation has not been tested without authorized credentials/model/account access.
 
-Trusted operators can grant another backend actor case membership using `python -m app.core.access --case-id <uuid-v4> --actor-id <uuid-v4>` under configured ADMIN context with case:write; the grant is audited. Production OIDC and operator policy remain deployment work.
+Protected bytes use generated UUID filenames under .storage with no public file route. Documents/pages are retained on soft delete. A trusted ADMIN with case:write can run `python -m app.core.access --case-id <uuid-v4> --actor-id <uuid-v4>` to grant backend membership; the grant is audited. Production OIDC remains deployment work.
 
-## Run and test
+## Challenge and repair behavior
 
-Health: http://127.0.0.1:8000/api/v1/health. OpenAPI: http://127.0.0.1:8000/openapi.json. API docs: http://127.0.0.1:8000/docs.
+Challenge POST returns **201** and creates DRAFT, following page 19's human-readiness note; the conflicting READY example remains documented. Human PATCH may mark READY. Only DRAFT/READY is editable; only eligible DRAFT is deletable.
+
+Repair POST returns **201**, requires Idempotency-Key and validates same-case finding/simulation plus VERIFIED source evidence. Actual runtime model, prompt/schema version, checks, latency and usage/null persist. before_text reproduces verified evidence; generated numeric impact is rejected. Quantitative interpretation is formatted from immutable stored simulation output without recalculating Aris's results. No official PDF is edited.
+
+Only DRAFT repair proposals can be edited. PATCH status=SUBMITTED freezes a new immutable content snapshot, sets case readiness for human review and increments case.version; refresh the case before sending expected_case_version to the future review endpoint. Submission does not itself approve the case or compute final assurance.
+
+Provider calls run outside the SQLite write lock. Same-key repair concurrency uses a bounded lease; successful and attempted-generation failure responses are replayed without another model call. A deliberate new generation after a cached failure requires a new key. Shared AuditService participates in the caller transaction across phases A/B; no adapter should independently commit.
+
+## Tests and owner integration
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest backend/tests -q
 .\.venv\Scripts\python.exe -m compileall -q backend/app
 ```
 
-Current result: **59 passed** plus a Uvicorn HTTP smoke test. Live OpenAI inference is not executed. There is no frontend source in this branch; no frontend check is claimed.
+See [verification](docs/VERIFICATION.md) for the current executed result. No frontend source is included in this branch. Live provider validation, full-system regression and integrated frontend/simulation/review workflows remain owner work.
 
-## Integration documentation
+- [Prompt B handoff](docs/TEGUH_DECISION_HANDOFF.md): ten new endpoints, prompt/schema versions, typed service ports, tests, errors, migration and merge notes for Aris/Fazhima.
+- [Prompt A handoff](docs/TEGUH_P0_HANDOFF.md): preserved historical baseline and 18 phase-A endpoints.
+- [Current OpenAPI](docs/openapi.teguh-p0.json): 28 business operations + health. openapi.foundation.json is archival.
+- [Contract lock](docs/CONTRACT_LOCK.md), [source snapshot](docs/contract_snapshot.json), [gaps](docs/CONTRACT_GAPS.md), [ownership](docs/OWNERSHIP.md), [file inventory](docs/FOUNDATION_FILES.md).
 
-- [P0 handoff](docs/TEGUH_P0_HANDOFF.md): changed files, migration, exact 18-route matrix, AI failure modes, security and owner dependencies.
-- [Current P0 OpenAPI](docs/openapi.teguh-p0.json): 18 business operations + health. openapi.foundation.json is an archival snapshot.
-- [Contract lock](docs/CONTRACT_LOCK.md) and [source snapshot](docs/contract_snapshot.json): all 36 full-system contracts, not all implemented here.
-- [Gaps](docs/CONTRACT_GAPS.md), [ownership](docs/OWNERSHIP.md), [verification](docs/VERIFICATION.md), and [file inventory](docs/FOUNDATION_FILES.md).
+Bind real owner adapters through `create_app(settings, simulation_lookup=..., audit_service=..., reference_lookup=..., review_preconditions=...)`. Defaults are read-only shared-model lookups and the explicit core audit adapter, not a fake simulator or review service. Read the handoff contracts before merge.
 
-Do not introduce APPROVE_CASE, fake clean-case repairs, client-authoritative review identity, or mix supplier fixture versions. Corrections are PROPOSED. Finding resolution requiring disposition evidence remains blocked pending an approved schema; dismissal is implemented. The integrated six-step workflow still requires teammate services and the separate challenge/repair phase.
+Clean-case completion remains OPEN / PROPOSED ADDENDUM: no APPROVE_CASE, fabricated finding or fake repair is added. Supplier data versions remain separate. Operational defaults, conservative language/numeric guards, health/OpenAPI exception and schema clarifications remain explicit PROPOSED policies.

@@ -59,11 +59,24 @@ def resource_for(db, actor, model, resource_id):
     return row
 
 
-def audit(db, actor, request_id, case_id, event_type, resource_type, resource_id, version, details=None):
+def append_core_audit(db, actor, request_id, case_id, event_type, resource_type, resource_id, version, details=None):
     # Integration writer only; Fazhima owns review/audit services and routes.
     db.add(AuditEvent(case_id=case_id, actor_id=actor.actor_id, request_id=request_id,
         event_type=event_type, resource_type=resource_type, resource_id=resource_id,
         resource_version=version, details_json=wire(details or {}), occurred_at=now()))
+
+
+
+def audit(db, actor, request_id, case_id, event_type, resource_type, resource_id, version, details=None):
+    """Delegate owned phase-A writes to the app's transaction-bound audit port."""
+    resolve = db.info.get("audit_service_provider")
+    service = resolve() if resolve else db.info.get("audit_service")
+    if service is None:
+        # Explicit default for trusted CLI/standalone sessions outside the app.
+        return append_core_audit(db, actor, request_id, case_id, event_type, resource_type, resource_id, version, details)
+    from app.core.integration import AuditCommand
+    service.record(db, AuditCommand(actor, request_id, case_id, event_type, resource_type,
+        resource_id, version, json.dumps(wire(details or {}), sort_keys=True)))
 
 
 def fingerprint(payload):
@@ -77,7 +90,7 @@ def idempotent_replay(db, actor, method, route, key, payload):
     if row:
         if row.request_hash != digest:
             raise ApiError(409, "IDEMPOTENCY_KEY_REUSED", "The idempotency key was used with different input")
-        return JSONResponse(row.response_body, status_code=row.response_status)
+        return JSONResponse(row.response_body, status_code=row.response_status, headers=row.response_headers or {})
     return None
 
 

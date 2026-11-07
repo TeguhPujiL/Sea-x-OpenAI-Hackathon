@@ -13,16 +13,21 @@ from app.core.database import build_engine, session_factory
 from app.core.upload_limit import UploadLimitMiddleware
 from app.services.ai.provider import OpenAIAnalysisProvider
 from app.services.ai.jobs import recover_interrupted_jobs
+from app.services.ai.decisions import OpenAIDecisionProvider
+from app.core.integration import (CoreAuditAdapter, StoredSimulationLookup, StoredReferenceLookup, SubmittedRepairPreconditions, AuditService, SimulationLookup, ReferenceLookup, ReviewPreconditionValidator)
 from app.schemas.shared import Envelope, ErrorDetail, HealthData
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, simulation_lookup: SimulationLookup | None = None,
+    audit_service: AuditService | None = None, reference_lookup: ReferenceLookup | None = None,
+    review_preconditions: ReviewPreconditionValidator | None = None) -> FastAPI:
     config = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         engine = build_engine(config.database_url)
         app.state.session_factory = session_factory(engine)
+        app.state.session_factory.configure(info={"audit_service_provider": lambda: app.state.audit_service})
         recover_interrupted_jobs(app)
         try:
             yield
@@ -30,9 +35,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine.dispose()
 
     app = FastAPI(title="ProcureMind V4.1", version="1.1", lifespan=lifespan,
-        description="Teguh P0 case/document/analysis/finding backend. Challenge/repair and teammate modules remain separate.")
+        description="Teguh P0 case/document/analysis/finding/challenge/repair backend. Simulation/review/audit services remain owner-integrated.")
     app.state.settings = config
     app.state.analysis_provider = OpenAIAnalysisProvider(config)
+    app.state.decision_provider = OpenAIDecisionProvider(config)
+    app.state.audit_service = audit_service or CoreAuditAdapter()
+    app.state.simulation_lookup = simulation_lookup or StoredSimulationLookup()
+    app.state.reference_lookup = reference_lookup or StoredReferenceLookup()
+    app.state.review_preconditions = review_preconditions or SubmittedRepairPreconditions(app.state.simulation_lookup)
     app.add_middleware(UploadLimitMiddleware, max_bytes=config.upload_max_bytes)
     app.dependency_overrides[get_settings] = lambda: config
     app.include_router(router, prefix="/api/v1")
@@ -87,6 +97,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     if method == "post" and path.endswith("/documents"):
                         for status in (413, 415, 422):
                             operation["responses"][str(status)] = {"description": "PDF upload rejection", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EnvelopeError"}}}}
+                    if method == "post" and path.endswith(("/challenges", "/repair-proposals")):
+                        for status in (422, 429, 502, 504):
+                            operation["responses"][str(status)] = {"description": "Decision evidence/provider error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EnvelopeError"}}}}
+                        operation["responses"]["429"]["headers"] = {"Retry-After": {"description": "Provider-requested delay when available", "schema": {"type": "string"}}}
+                    if method == "patch" and ("/challenges/" in path or "/repair-proposals/" in path):
+                        operation["responses"]["422"] = {"description": "Required evidence or draft grounding failed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EnvelopeError"}}}}
             error_schema = Envelope[None].model_json_schema(ref_template="#/components/schemas/{model}")
             definitions = error_schema.pop("$defs", {})
             schema.setdefault("components", {}).setdefault("schemas", {}).update(definitions)

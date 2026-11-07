@@ -1,4 +1,4 @@
-"""Explicit SQLite migration 0001: foundation -> Teguh P0.
+"""Explicit SQLite migrations 0001/0002: foundation -> Teguh P0 decisions.
 
 Back up the SQLite file before running. Migration preserves existing rows and
 fails if referential integrity is already broken. It never invents actor/input
@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.core.database import build_engine
 from app.models import Base, AiExecution
 from app.models.integrity import install_guards
+from app.models.decisions import install_decision_guards
 
 
 def migrate(engine):
@@ -20,7 +21,7 @@ def migrate(engine):
         connection.commit()
         try:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
-            if connection.exec_driver_sql("PRAGMA user_version").scalar() > 1:
+            if connection.exec_driver_sql("PRAGMA user_version").scalar() > 2:
                 raise RuntimeError("Database is newer than this migration runner")
             inspector = inspect(connection)
             tables = inspector.get_table_names()
@@ -43,14 +44,19 @@ def migrate(engine):
                 for name, sql_type in additions.items():
                     if name not in existing:
                         connection.exec_driver_sql(f"ALTER TABLE analysis_jobs ADD COLUMN {name} {sql_type}")
+            if "idempotency_records" in tables:
+                fields = {c["name"] for c in inspect(connection).get_columns("idempotency_records")}
+                if "response_headers" not in fields:
+                    connection.exec_driver_sql("ALTER TABLE idempotency_records ADD COLUMN response_headers JSON NOT NULL DEFAULT '{}'")
             Base.metadata.create_all(connection)
             install_guards(connection)
+            install_decision_guards(connection)
             for name in ("ai_executions", "simulations", "reviews", "audit_events"):
                 for operation in ("UPDATE", "DELETE"):
                     connection.exec_driver_sql(f"CREATE TRIGGER IF NOT EXISTS protect_{name}_{operation.lower()} BEFORE {operation} ON {name} BEGIN SELECT RAISE(ABORT, 'immutable record'); END")
             if connection.exec_driver_sql("PRAGMA foreign_key_check").first() is not None:
                 raise RuntimeError("Foreign key validation failed; migration rolled back")
-            connection.exec_driver_sql("PRAGMA user_version=1")
+            connection.exec_driver_sql("PRAGMA user_version=2")
             connection.commit()
         except Exception:
             connection.rollback()

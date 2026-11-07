@@ -58,7 +58,7 @@ def test_p0_routes_match_contract_and_exclude_teammate_routes():
     schema = create_app().openapi()
     snapshot = json.loads((Path(__file__).resolve().parents[2] / "docs/contract_snapshot.json").read_text())
     expected = {(e["path"], e["method"].lower()): e["success_code"] for e in snapshot["endpoints"]
-                if e["scope"].split(":")[0] in {"case", "document", "analysis", "finding"}}
+                if e["scope"].split(":")[0] in {"case", "document", "analysis", "finding", "challenge", "repair"}}
     actual = {(path.removeprefix("/api/v1"), method): operation for path, methods in schema["paths"].items()
               for method, operation in methods.items() if path != "/api/v1/health"}
     assert set(actual) == set(expected)

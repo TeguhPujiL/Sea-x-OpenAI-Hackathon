@@ -1,3 +1,5 @@
+> Historical Prompt A handoff (59-test baseline). Challenge/Repair are now implemented; current scope, 100-test results and integration contracts are in [TEGUH_DECISION_HANDOFF.md](TEGUH_DECISION_HANDOFF.md). The current openapi.teguh-p0.json contains 28 business operations plus health; remaining-work statements below describe the earlier phase-A snapshot.
+
 # Teguh P0 case, document, analysis and finding handoff
 
 Branch: teguh. Source of truth: API Contract v1.1, Section 2.3, docs/CONTRACT_LOCK.md and the checked source hash. This implements the requested phase-A backend; challenge/repair remain skeletons. No Simulation or Review/Audit router/service was modified or introduced.

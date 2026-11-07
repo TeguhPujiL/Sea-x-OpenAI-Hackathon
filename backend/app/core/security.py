@@ -33,7 +33,7 @@ def require_scope(scope: str):
 
 
 def require_idempotency_key(
-    key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> str:
     if key is None or not key.strip():
         # PROPOSED missing-key mapping; contract supplies no distinct missing-key code.

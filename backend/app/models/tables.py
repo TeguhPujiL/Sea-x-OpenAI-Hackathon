@@ -206,6 +206,7 @@ class IdempotencyRecord(Identity, Created, Base):
     request_hash = Column(String(64), nullable=False)
     response_status = Column(Integer, nullable=False)
     response_body = Column(JSON, nullable=False)
+    response_headers = Column(JSON, nullable=False, default=dict)
     __table_args__ = (UniqueConstraint("actor_id", "method", "route", "key"),)
 
 

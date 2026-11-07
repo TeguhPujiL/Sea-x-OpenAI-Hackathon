@@ -1,0 +1,457 @@
+{
+  "contract_version": "1.1",
+  "api_version": "v1",
+  "base_path": "/api/v1",
+  "source_filename": "8. ProcureMind_V4_1_API_Contract.pdf",
+  "source_pages": 39,
+  "source_sha256": "fcc0388407f9cac2804b71be151f41a444a546bfa5d6648ac2ef33a4a40aecdc",
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/cases",
+      "success_code": 201,
+      "scope": "case:write",
+      "source_page": 5,
+      "idempotency_key_required": true
+    },
+    {
+      "method": "GET",
+      "path": "/cases",
+      "success_code": 200,
+      "scope": "case:read",
+      "source_page": 6,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/cases/{case_id}",
+      "success_code": 200,
+      "scope": "case:read",
+      "source_page": 7,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/cases/{case_id}",
+      "success_code": 200,
+      "scope": "case:write",
+      "source_page": 8,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/cases/{case_id}",
+      "success_code": 200,
+      "scope": "case:delete",
+      "source_page": 9,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "POST",
+      "path": "/cases/{case_id}/documents",
+      "success_code": 201,
+      "scope": "document:write",
+      "source_page": 9,
+      "idempotency_key_required": true
+    },
+    {
+      "method": "GET",
+      "path": "/cases/{case_id}/documents",
+      "success_code": 200,
+      "scope": "document:read",
+      "source_page": 10,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/documents/{document_id}",
+      "success_code": 200,
+      "scope": "document:read",
+      "source_page": 10,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/documents/{document_id}",
+      "success_code": 200,
+      "scope": "document:write",
+      "source_page": 11,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/documents/{document_id}",
+      "success_code": 200,
+      "scope": "document:delete",
+      "source_page": 12,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "POST",
+      "path": "/cases/{case_id}/analyses",
+      "success_code": 202,
+      "scope": "analysis:write",
+      "source_page": 12,
+      "idempotency_key_required": true
+    },
+    {
+      "method": "GET",
+      "path": "/jobs/{job_id}",
+      "success_code": 200,
+      "scope": "analysis:read",
+      "source_page": 13,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/cases/{case_id}/jobs",
+      "success_code": 200,
+      "scope": "analysis:read",
+      "source_page": 14,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "POST",
+      "path": "/jobs/{job_id}/retries",
+      "success_code": 202,
+      "scope": "analysis:write",
+      "source_page": 15,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/cases/{case_id}/findings",
+      "success_code": 200,
+      "scope": "finding:read",
+      "source_page": 16,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/findings/{finding_id}",
+      "success_code": 200,
+      "scope": "finding:read",
+      "source_page": 17,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/findings/{finding_id}",
+      "success_code": 200,
+      "scope": "finding:write",
+      "source_page": 17,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "POST",
+      "path": "/findings/{finding_id}/dismissals",
+      "success_code": 201,
+      "scope": "finding:decide",
+      "source_page": 18,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "POST",
+      "path": "/cases/{case_id}/challenges",
+      "success_code": 201,
+      "scope": "challenge:write",
+      "source_page": 19,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/cases/{case_id}/challenges",
+      "success_code": 200,
+      "scope": "challenge:read",
+      "source_page": 20,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/challenges/{challenge_id}",
+      "success_code": 200,
+      "scope": "challenge:read",
+      "source_page": 20,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/challenges/{challenge_id}",
+      "success_code": 200,
+      "scope": "challenge:write",
+      "source_page": 21,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/challenges/{challenge_id}",
+      "success_code": 200,
+      "scope": "challenge:delete",
+      "source_page": 22,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "POST",
+      "path": "/cases/{case_id}/simulations",
+      "success_code": 201,
+      "scope": "simulation:write",
+      "source_page": 22,
+      "idempotency_key_required": true
+    },
+    {
+      "method": "GET",
+      "path": "/cases/{case_id}/simulations",
+      "success_code": 200,
+      "scope": "simulation:read",
+      "source_page": 23,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/simulations/{simulation_id}",
+      "success_code": 200,
+      "scope": "simulation:read",
+      "source_page": 25,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "POST",
+      "path": "/findings/{finding_id}/repair-proposals",
+      "success_code": 201,
+      "scope": "repair:write",
+      "source_page": 26,
+      "idempotency_key_required": true
+    },
+    {
+      "method": "GET",
+      "path": "/findings/{finding_id}/repair-proposals",
+      "success_code": 200,
+      "scope": "repair:read",
+      "source_page": 26,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/repair-proposals/{repair_proposal_id}",
+      "success_code": 200,
+      "scope": "repair:read",
+      "source_page": 27,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/repair-proposals/{repair_proposal_id}",
+      "success_code": 200,
+      "scope": "repair:write",
+      "source_page": 28,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/repair-proposals/{repair_proposal_id}",
+      "success_code": 200,
+      "scope": "repair:delete",
+      "source_page": 29,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "POST",
+      "path": "/cases/{case_id}/reviews",
+      "success_code": 201,
+      "scope": "review:decide",
+      "source_page": 29,
+      "idempotency_key_required": true
+    },
+    {
+      "method": "GET",
+      "path": "/cases/{case_id}/reviews",
+      "success_code": 200,
+      "scope": "review:read",
+      "source_page": 30,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/reviews/{review_id}",
+      "success_code": 200,
+      "scope": "review:read",
+      "source_page": 31,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/cases/{case_id}/audit",
+      "success_code": 200,
+      "scope": "audit:read",
+      "source_page": 32,
+      "idempotency_key_required": false
+    },
+    {
+      "method": "GET",
+      "path": "/audit-events/{event_id}",
+      "success_code": 200,
+      "scope": "audit:read",
+      "source_page": 32,
+      "idempotency_key_required": false
+    }
+  ],
+  "enums": {
+    "ProcessingStatus": [
+      "QUEUED",
+      "PROCESSING",
+      "COMPLETED",
+      "FAILED",
+      "NEEDS_REVIEW"
+    ],
+    "CaseStatus": [
+      "DRAFT",
+      "UNDER_ASSESSMENT",
+      "UNDER_REVIEW",
+      "REVIEW_COMPLETED",
+      "ARCHIVED"
+    ],
+    "AssuranceStatus": [
+      "ACTION_REQUIRED",
+      "READY_FOR_REVIEW",
+      "REVIEW_COMPLETED"
+    ],
+    "FindingStatus": [
+      "OPEN",
+      "UNDER_REVIEW",
+      "RESOLVED",
+      "DISMISSED"
+    ],
+    "EvidenceStatus": [
+      "VERIFIED",
+      "UNVERIFIED",
+      "CONFLICTING",
+      "INSUFFICIENT"
+    ],
+    "FindingSeverity": [
+      "LOW",
+      "MEDIUM",
+      "HIGH",
+      "CRITICAL"
+    ],
+    "ChallengeStatus": [
+      "DRAFT",
+      "READY",
+      "CLOSED"
+    ],
+    "RepairStatus": [
+      "DRAFT",
+      "SUBMITTED",
+      "APPROVED",
+      "REJECTED",
+      "WITHDRAWN"
+    ],
+    "RepairActionType": [
+      "REVISE_REQUIREMENT",
+      "MAINTAIN_WITH_JUSTIFICATION",
+      "REQUEST_MORE_EVIDENCE"
+    ],
+    "ReviewDecision": [
+      "APPROVE_DRAFT",
+      "REQUEST_REVISION",
+      "REQUEST_EVIDENCE",
+      "REJECT_DRAFT"
+    ],
+    "DocumentType": [
+      "TOR",
+      "TECHNICAL_SPECIFICATION",
+      "OWNER_COST_ESTIMATE",
+      "TECHNICAL_JUSTIFICATION",
+      "SUPPLIER_QUOTATION",
+      "WARRANTY_EVIDENCE",
+      "EVALUATION_REPORT",
+      "CONTRACT",
+      "OTHER"
+    ],
+    "AnalysisType": [
+      "REQUIREMENT_EXTRACTION",
+      "CONTRADICTION_DETECTION"
+    ]
+  },
+  "error_catalog": [
+    {
+      "http_status": 400,
+      "code": "VALIDATION_ERROR",
+      "retry_guidance": "No"
+    },
+    {
+      "http_status": 401,
+      "code": "AUTHENTICATION_REQUIRED",
+      "retry_guidance": "After re-auth"
+    },
+    {
+      "http_status": 403,
+      "code": "FORBIDDEN",
+      "retry_guidance": "No"
+    },
+    {
+      "http_status": 404,
+      "code": "RESOURCE_NOT_FOUND",
+      "retry_guidance": "No"
+    },
+    {
+      "http_status": 409,
+      "code": "VERSION_CONFLICT",
+      "retry_guidance": "After refresh"
+    },
+    {
+      "http_status": 409,
+      "code": "INVALID_STATE_TRANSITION",
+      "retry_guidance": "No"
+    },
+    {
+      "http_status": 409,
+      "code": "IDEMPOTENCY_KEY_REUSED",
+      "retry_guidance": "New key only"
+    },
+    {
+      "http_status": 413,
+      "code": "FILE_TOO_LARGE",
+      "retry_guidance": "No"
+    },
+    {
+      "http_status": 415,
+      "code": "UNSUPPORTED_MEDIA_TYPE",
+      "retry_guidance": "No"
+    },
+    {
+      "http_status": 422,
+      "code": "PDF_EXTRACTION_FAILED",
+      "retry_guidance": "Maybe after new file/OCR"
+    },
+    {
+      "http_status": 422,
+      "code": "EVIDENCE_VALIDATION_FAILED",
+      "retry_guidance": "Human review/new evidence"
+    },
+    {
+      "http_status": 422,
+      "code": "SIMULATION_INPUT_INVALID",
+      "retry_guidance": "After correction"
+    },
+    {
+      "http_status": 429,
+      "code": "RATE_LIMITED",
+      "retry_guidance": "Yes; honor Retry-After"
+    },
+    {
+      "http_status": 500,
+      "code": "INTERNAL_ERROR",
+      "retry_guidance": "Maybe"
+    },
+    {
+      "http_status": 502,
+      "code": "AI_PROVIDER_ERROR",
+      "retry_guidance": "Usually"
+    },
+    {
+      "http_status": 504,
+      "code": "AI_PROVIDER_TIMEOUT",
+      "retry_guidance": "Yes"
+    }
+  ]
+}

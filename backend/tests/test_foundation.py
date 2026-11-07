@@ -54,8 +54,26 @@ def test_health_openapi_and_safe_errors():
         assert "private-provider-secret" not in failure.text
 
 
-def test_only_health_is_registered():
-    assert set(create_app().openapi()["paths"]) == {"/api/v1/health"}
+def test_registered_routes_follow_contract_inventory():
+    paths = create_app().openapi()["paths"]
+    snapshot = json.loads((Path(__file__).resolve().parents[2] / "docs/contract_snapshot.json").read_text())
+    contracted = {
+        (endpoint["method"].lower(), snapshot["base_path"] + endpoint["path"]): endpoint["success_code"]
+        for endpoint in snapshot["endpoints"]
+    }
+    # Health is an explicit foundation exception, separate from business APIs.
+    assert "get" in paths["/api/v1/health"]
+    assert "200" in paths["/api/v1/health"]["get"]["responses"]
+    http_methods = {"get", "post", "put", "patch", "delete", "head", "options", "trace"}
+    for path, operations in paths.items():
+        for method in http_methods.intersection(operations):
+            if (method, path) == ("get", "/api/v1/health"):
+                continue
+            assert (method, path) in contracted, f"Uncontracted endpoint: {method.upper()} {path}"
+            expected_status = str(contracted[(method, path)])
+            assert expected_status in operations[method]["responses"], (
+                f"{method.upper()} {path} must declare success status {expected_status}"
+            )
 
 
 def test_enum_sets_match_checked_contract():

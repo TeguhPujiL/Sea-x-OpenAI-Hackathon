@@ -1,29 +1,58 @@
-# Simulation implementation and integration
+# Deterministic simulation: contract verification and handoff
 
-Implemented from the user's simulation requirements and supplied playbook/contract-lock excerpt.
-The complete API Contract v1.1 sections 6.6 and 8, Appendix A/B, and approved
-domain wire schemas are still absent from this checkout. This is not a claim of
-full v1.1 compliance. No shared core, schema, model or other-owner file was changed.
+## Verified sources and precedence
 
-## Files
+- API Contract v1.1: `8. ProcureMind_V4_1_API_Contract.pdf`, supplied in the user's
+  Downloads directory, 39 pages; SHA-256
+  `fcc0388407f9cac2804b71be151f41a444a546bfa5d6648ac2ef33a4a40aecdc`.
+  Sections 2.3, 3, 6.6 (pages 22-26), 8 (page 35), Appendix A/B (pages 37-39)
+  control this implementation. The hash matches the checked-in contract lock.
+- PRD: `1. ProcureMind_PRD_V4.1_Enhanced.pdf`, 24 pages; SHA-256
+  `f591154dd1c39a3093bd371f550b40b39188c0a46697fb2e978da302a63c84fd`.
+  US-D02 on page 11 requests eligibility identifiers, assumptions and input hash.
+- Execution Playbook: secondary team/ownership guidance, especially pages 3 and 13.
+- Current `docs/CONTRACT_LOCK.md`, `docs/CONTRACT_GAPS.md`, and approved shared
+  schemas/models are used directly; no shared declaration was changed.
 
-- `app/api/routes/simulations.py`: three synchronous endpoints and local validation/error handling.
-- `app/services/simulation/models.py`: closed, frozen, simulation-local input and fixture models.
-- `app/services/simulation/engine.py`: pure integer engine, fixture verification and deterministic interpretation.
-- `app/services/simulation/manifest.py`: immutable version-to-file registry and SHA-256.
-- `app/services/simulation/fixtures/synthetic-suppliers-v1.json`: server-only golden supplier data.
-- `app/services/simulation/repository.py`: SQLite append-only persistence.
-- `app/services/simulation/service.py`: authorization checks, snapshots, creation, list and detail.
-- `app/services/simulation/__init__.py`: package boundary.
-- `tests/test_simulation.py`: engine, API, authorization, persistence and version-isolation tests.
-- `app/services/simulation/INTEGRATION.md`: this handoff and examples.
+The PRD's older `/v1/.../scenarios`, scenario request fields, and error naming
+are not substituted for v1.1's `/api/v1/.../simulations` and canonical envelope.
+Additional PRD reproducibility metadata is retained internally without adding
+unapproved fields to the Section 6.6 wire response. Shared schema changes still
+require Teguh review. This does not claim integrated release readiness.
 
-## Fixture manifest and formulas
+## Changed files
 
-Engine: `simulation-engine-v1`. Supplier data: `synthetic-suppliers-v1`.
-Source: user-confirmed contract golden fixture, not the negative PDF evidence pack.
-SHA-256 (exact JSON bytes):
+- `app/api/routes/simulations.py`: strict three-route API, scopes, idempotency
+  header, canonical envelopes, typed OpenAPI and pagination.
+- `app/services/simulation/models.py`: simulation-local closed wire schemas and
+  `supplier_ref` projection, using the approved shared envelope/money/time types.
+- `app/services/simulation/engine.py`: contract engine identifier.
+- `app/services/simulation/service.py`: deterministic snapshots, input hashes,
+  eligibility identifiers, assumptions, read authorization and wire projection.
+- `app/services/simulation/shared_repository.py`: shared-table persistence,
+  live reference checks, atomic simulation/audit/idempotency transaction and replay.
+- `app/services/simulation/migrate.py`: explicit SQLite immutability guard migration.
+- `tests/test_simulation.py`: updated contract assertions and deterministic IDs.
+- `tests/test_foundation.py`: user-authorized fix for the obsolete health-only assertion.
+- `tests/test_simulation_shared.py`: real shared-database integration regressions.
+- `app/services/simulation/INTEGRATION.md`: this handoff.
+
+The existing `repository.py` remains a standalone historical test-store adapter.
+It is not used by the HTTP routes and must not be pointed at the shared database.
+No shared schemas, models, core code, assurance internals or frontend sources changed.
+
+## Fixture manifest and exact formula
+
+Engine: `supplier-eligibility-v1`. Supplier data: `synthetic-suppliers-v1`.
+Source: v1.1 golden fixture, not the negative PDF evidence pack.
+
+File: `fixtures/synthetic-suppliers-v1.json`.
+SHA-256 (unchanged exact bytes):
 `452fe33326a14d9dccd6f44f2e5c0336243a9243949f5d33f1d9a6e7b60a945e`.
+The explicit version/file/digest registry is in `manifest.py`. Published fixture
+bytes still use the original internal `supplier_id` key; the loader normalizes
+that key and all wire snapshots use the contracted `supplier_ref`. No prices,
+RAM mapping, quantity or fixture bytes were rewritten under an existing version.
 
 | Supplier | RAM GB | Unit price IDR | Quantity | Total IDR |
 | --- | ---: | ---: | ---: | ---: |
@@ -31,32 +60,40 @@ SHA-256 (exact JSON bytes):
 | SYN-B | 16 | 13,800,000 | 50 | 690,000,000 |
 | SYN-C | 32 | 16,500,000 | 50 | 825,000,000 |
 
-For each scenario, eligible suppliers satisfy `ram_gb >= minimum_ram_gb`.
-`eligible_supplier_count = len(eligible)`.
-`lowest_total_offer_idr = min(unit_price_idr * quantity for eligible suppliers)`.
-For both metrics, `delta = alternative - baseline`. All arithmetic uses Python
-integers, including multiplication; no float conversion, AI output or live price call.
+For each scenario:
 
-| Scenario | Eligible supplier count | Lowest total offer IDR |
+```text
+eligible = supplier.ram_gb >= minimum_ram_gb
+eligible_supplier_count = len(eligible)
+lowest_total_offer_idr = min(unit_price_idr * quantity for eligible suppliers)
+delta.metric = alternative.metric - baseline.metric
+```
+
+Only integer arithmetic is used. Quantity belongs to the selected synthetic
+fixture version; it is never supplied by the browser or guessed by an LLM.
+
+| Scenario | Count | Lowest total IDR |
 | --- | ---: | ---: |
 | Baseline 32 GB | 1 | 825,000,000 |
 | Alternative 16 GB | 3 | 660,000,000 |
 | Delta | +2 | -165,000,000 |
 
-Deterministic golden interpretation:
-“The alternative expands synthetic eligibility. The price delta is illustrative
-and is not evidence of actual savings, loss, overpricing, collusion, or wrongdoing.”
-For other inputs the eligibility verb is `reduces` or `preserves` as appropriate.
+The deterministic golden interpretation states: “The alternative expands
+synthetic eligibility. The price delta is illustrative and is not evidence of
+actual savings, loss, overpricing, collusion, or wrongdoing.” Other scenarios
+use `reduces` or `preserves` when the eligible count changes differently.
 
 ## API examples
 
-These examples require a configured trusted authorization adapter and storage.
-Use identifiers for a real persisted case and its related finding; example UUIDs
-do not create resources or grant access. No supplier prices/records come from the browser.
+These requests require a provisioned database, an authenticated backend actor
+with the relevant scope and a trusted case-access policy. The example IDs must
+refer to an existing case and its persisted finding; examples do not create them.
 
 ```http
 POST /api/v1/cases/11111111-1111-4111-8111-111111111111/simulations
 Content-Type: application/json
+Accept: application/json
+Idempotency-Key: golden-simulation-001
 
 {
   "finding_id": "22222222-2222-4222-8222-222222222222",
@@ -66,16 +103,15 @@ Content-Type: application/json
 }
 ```
 
-Returns `201` synchronously. The existing four-key envelope is preserved:
-`{"success":true,"data":<record>,"error":null,"meta":{}}`.
-The record includes a new UUID v4 `simulation_id`, `case_id`, `finding_id`,
-`engine_version`, `supplier_data_version`, `input_snapshot`, `result`,
-`interpretation`, and server-generated UTC `created_at` ending in `Z`.
-The complete input snapshot contains case/finding IDs, both normalized scenarios,
-supplier data version, quantity, and all suppliers sorted by supplier ID. It
-supports replay without reloading a mutable external dataset.
+Returns `201` synchronously with `success`, `data`, `error`, `meta`.
+`data` has exactly `simulation_id`, `case_id`, `finding_id`, `engine_version`,
+`input_snapshot`, `result`, `interpretation`, `created_at`. IDs are UUID v4;
+`created_at` is server-generated UTC with Z. `meta` contains `request_id`,
+`timestamp` and `api_version: "v1"`.
 
-The exact golden `result` is:
+The public `input_snapshot` has exactly `quantity`, `baseline`, `alternative`,
+`suppliers`; each supplier has `supplier_ref`, `ram_gb`, `unit_price_idr`.
+The exact golden result is:
 
 ```json
 {
@@ -86,106 +122,119 @@ The exact golden `result` is:
 ```
 
 ```http
-GET /api/v1/cases/11111111-1111-4111-8111-111111111111/simulations
+GET /api/v1/cases/11111111-1111-4111-8111-111111111111/simulations?limit=20&offset=0
 GET /api/v1/simulations/<simulation_id-returned-by-post>
 ```
 
-List returns `200` with `data` containing records in insertion order. Detail
-returns `200` with `data` containing the record. There are no PATCH/DELETE routes.
-Changed parameters create a separate record. Repeating identical inputs also
-creates separate IDs/timestamps, with identical normalized snapshots, results
-and interpretation for the same case, finding, fixture and engine version.
+List returns `200` and `data.items` plus `data.pagination` (`limit`, `offset`,
+`total`), in creation-time/ID order. Detail returns `200` and the same record
+projection. There are no PATCH or DELETE endpoints.
 
-All unknown request fields (including operators, prices and supplier records),
-missing/unknown data versions, malformed UUIDs/JSON, non-positive or non-integer
-RAM, and empty eligible sets return `422` with `SIMULATION_INPUT_INVALID`.
-Server fixture validation rejects negative, fractional, string and boolean IDR;
-zero IDR is valid. It also rejects invalid quantity/RAM, empty datasets and
-duplicate supplier IDs. Fixture integrity/configuration failures abort catalog
-construction rather than letting the API run with unverified data.
+Unknown supplier versions, invalid RAM, missing versions and empty eligible
+sets return `422 SIMULATION_INPUT_INVALID`. Malformed JSON, unknown fields
+(including operators/prices/supplier records), invalid resource IDs and invalid
+pagination use `400 VALIDATION_ERROR` per Appendix B. A missing/blank idempotency
+key uses the existing shared `400 VALIDATION_ERROR` policy. No unknown error code
+is introduced. Errors have `code`, `message`, `details`, `retryable` plus metadata;
+request values, document text and internal exception details are not echoed.
 
-Example unknown-version error:
+## Persistence, reproducibility and PRD mapping
 
-```json
-{
-  "success": false,
-  "data": null,
-  "error": {"code": "SIMULATION_INPUT_INVALID", "message": "Unknown supplier_data_version"},
-  "meta": {}
-}
-```
+HTTP creation uses existing shared `Simulation`, `AuditEvent` and
+`IdempotencyRecord` models. All three writes commit or roll back together.
+The engine/supplier versions and complete normalized snapshot are persisted.
+The internal snapshot additionally retains case/finding IDs, supplier version
+and `provenance` with:
 
-The error nesting, metric names, list shape, empty-set mapping and non-input
-error codes remain simulation-local proposals pending the missing primary
-contract and Teguh's shared-schema review. They must not silently become a
-shared contract. No idempotency header semantics have been inferred.
+- `input_hash`: SHA-256 of canonical JSON containing the engine version and
+  complete normalized input, before adding the provenance object itself.
+- `eligible_supplier_ids`: baseline/alternative lists computed by the engine's
+  RAM predicate and sorted by supplier reference.
+- `assumptions`: explicit synthetic-data, fixed-quantity and RAM-only limits.
 
-## Teguh integration requirements
+This maps PRD US-D02 without introducing PRD-only wire fields or endpoints.
+No new database columns are required. The public snapshot is an intentional
+Section 6.6 projection; the full persisted snapshot supports internal replay.
+G07 remains open: supplier_data_version is persisted but is not silently added
+as an outer response field.
 
-1. Provide approved response/error schemas, section 8 empty-set behavior and
-   any required idempotency scope. Review the local wire types without altering
-   the numerical golden fixture. Shared schemas were not changed.
-2. Provision `SimulationRepository(path).provision()` during deployment setup;
-   assign `app.state.simulation_service = SimulationService(repository,
-   SupplierCatalog.packaged())` and close the repository at shutdown. There is
-   no implicit table creation or fabricated case/finding data. This repository
-   currently supports SQLite, with its own local table, not a migration in shared
-   SQLAlchemy metadata. Coordinate migration/backend selection with persistence owner.
-3. Trusted backend middleware must populate `request.state.simulation_access`
-   with a request-scoped `SimulationAccess` implementation derived from real
-   authenticated identity. `require_case(case_id)` must check persisted case
-   access; `require_finding(case_id, finding_id)` must verify persisted finding
-   access and case relationship. Both must raise `SimulationError` on denial.
-   Demo identity or browser identity headers alone are insufficient. Case/finding
-   owners must make these checks consistent with concurrent ownership changes.
-   Tests use an explicit test-only adapter; no permissive production adapter exists.
-4. Without configured storage/access the routes fail closed with `503
-   SIMULATION_UNAVAILABLE`. Missing records return proposed `404
-   SIMULATION_NOT_FOUND`; the test adapter's access denial uses proposed `403
-   SIMULATION_ACCESS_DENIED`. Map these through the approved shared contract.
-5. SQLite triggers reject UPDATE, DELETE and replacement of existing simulation
-   IDs or storage sequence IDs, including a separate connection. This does not
-   protect against an administrator dropping triggers/schema or replacing the
-   database file. Production role and filesystem restrictions remain deployment work.
-6. Include `app.services.simulation/fixtures/*.json` as package data in the
-   shared build configuration before building wheels; source-checkout execution
-   loads it directly. That configuration is outside Aris's ownership boundary.
-7. Never overwrite an existing fixture version. Add a separately named fixture
-   and manifest digest for any new dataset and new golden expectations. The
-   negative PDF evidence pack has no registered supplier version here. Tests use
-   a clearly named independent test-only version, not negative-pack prices.
+Idempotency scope is actor + POST + concrete case route + key. The normalized
+request hash includes case ID and the validated request. Reordered JSON keys
+replay identically. Same key/different normalized input returns `409
+IDEMPOTENCY_KEY_REUSED`; a new key creates a new immutable record. Existing
+idempotency rows are checked before recomputation, after access/reference checks.
+SQLite writers use BEGIN IMMEDIATE, and the unique key constraint handles races.
+Audit records reference the trusted actor, request ID, simulation, versions,
+input hash and scenario thresholds. The local `SIMULATION_CREATED` event name is
+an implementation identifier, not a newly invented closed shared enum.
 
-## Verification
+PROPOSED operational choices under G09: replay returns the stored `201` envelope
+(including original metadata); the current transport X-Request-ID may differ.
+No TTL/purge policy is added. List defaults are limit=20 and offset=0, with no
+invented contract maximum. Missing/cross-case/deleted references use 404; explicit
+ACL denials use the adapter's approved 403/404 policy. These choices require
+integration-owner review before release.
 
-From `backend`, use an environment with the backend/test dependencies:
+## Integration and migration requirements
+
+1. Provision the shared schema through the persistence owner's migration/setup.
+   No simulation route creates tables. On an existing SQLite schema run:
+
+   ```sh
+   python -m app.services.simulation.migrate --database-url sqlite:///procuremind.db
+   ```
+
+   This repeatable migration installs UPDATE, DELETE and REPLACE guards only.
+   It does not create or alter shared table/column declarations. It is SQLite-only.
+   Database administrators can still drop schema or replace files; deployment
+   privileges and backups remain necessary.
+2. The router obtains `app.state.session_factory` from the existing application
+   lifespan. No manually assigned `app.state.simulation_service` is required.
+   It uses shared `simulation:write` / `simulation:read` scope dependencies and
+   the shared Idempotency-Key dependency.
+3. Trusted authentication/ACL middleware must populate request-scoped
+   `request.state.simulation_access`, bound to the backend-authenticated actor.
+   Its `require_case(case_id)` and `require_finding(case_id, finding_id)` methods
+   must enforce the real policy and raise ApiError or SimulationError on denial.
+   `PersistedSimulationAccess` independently verifies case existence, deletion
+   state and finding/case relationships. Identity alone or browser headers never
+   grant case access. No permissive production adapter or fabricated cases exist.
+   Missing identity returns 401; missing scope returns 403; a missing configured
+   ACL adapter returns 500 INTERNAL_ERROR without exposing resource data.
+4. Coordinate ACL changes and transaction isolation with case owners so concurrent
+   access changes follow the team's reviewed policy. SQLite references are checked
+   again inside the write transaction. Production OIDC is still outside this module.
+5. The shared build owner must include `app.services.simulation/fixtures/*.json`
+   as package data before building wheels. Source-checkout execution is verified;
+   wheel packaging remains an integration gate outside this ownership boundary.
+6. Never overwrite a published supplier version. Add separately named fixtures,
+   digests and golden expectations for future data. The negative PDF pack's
+   710M/835M/680M values are not registered here. Test-only independent-v2 uses
+   separate explicit data and is not a negative-pack fixture.
+7. The old standalone store has a different schema. Do not reuse its database as
+   the shared database or silently mutate historical records. Coordinate any
+   historical migration with persistence owner. Existing records remain immutable.
+8. The user explicitly requested fixing the stale foundation route assertion.
+   `tests/test_foundation.py::test_registered_routes_follow_contract_inventory`
+   now requires health and validates every registered business method/path and
+   success status against the checked-in contract inventory. It permits the
+   staged addition of contracted feature routers without permitting new APIs.
+
+## Verification commands
 
 ```sh
+python -m pytest tests/test_simulation.py tests/test_simulation_shared.py -q -p no:cacheprovider
 python -m pytest -q -p no:cacheprovider
 ```
 
-Coverage includes exact golden values, canonical normalized replay after database
-reopen, distinct records on changed parameters, SQL immutability, integer precision,
-fixture tampering, version isolation, closed request validation, canonical four-key
-envelopes and case/finding authorization on creation/list/detail.
+Coverage includes exact golden values and wire shapes, normalized replay,
+input hash and eligibility provenance, reopen persistence, SQL immutability,
+fixture integrity/version isolation, structural/scenario error distinction,
+scopes, trusted case ACL, persisted cross-case relationships, soft deletion,
+audit rollback, concurrent same-key creation and actor/route idempotency scope.
+The stale foundation-only route assertion was replaced with a contract-inventory
+check at the user's explicit request. The full backend suite is rerun after this fix.
 
-The checked-in contract lock remains blocked; the supplied excerpt confirms
-specific requirements but does not replace the missing primary sections/appendices.
-
-
-## Update after merging origin/main 45b0c9e
-
-The upstream foundation now contains a source-verified contract transcription,
-shared envelope types and response helpers. Earlier missing-contract statements
-above describe the original implementation baseline; consult the current
-docs/CONTRACT_LOCK.md and docs/CONTRACT_GAPS.md for the updated source state.
-The simulation router now uses shared success/failure helpers with request_id,
-timestamp, api_version, error details and retryable. The service uses the new
-UtcTimestamp serializer instead of removed utc_now/utc_z helpers.
-
-This merge compatibility update preserves the local simulation behavior. Full
-feature integration with the new foundation remains pending, including the
-contract engine-version identifier, persisted response projection, pagination,
-scope checks, transactional idempotency/audit, shared persistence and the
-contract distinction between 400 VALIDATION_ERROR and 422 semantic errors.
-The upstream foundation-only route test assumes no business routes exist and
-must be updated by its owner when feature routes are integrated.
+Frontend typecheck and production build were run successfully against a temporary
+copy of the unchanged frontend using its package-lock.json and npm ci. No source,
+node_modules, lockfile or build artifacts were added to the repository for that check.

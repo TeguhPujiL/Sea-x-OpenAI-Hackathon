@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from app.services.simulation.models import SimulationInput, SupplierDataset
 
-ENGINE_VERSION = "simulation-engine-v1"
+ENGINE_VERSION = "supplier-eligibility-v1"
 INPUT_INVALID = "SIMULATION_INPUT_INVALID"
 
 

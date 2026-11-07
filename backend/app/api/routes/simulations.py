@@ -1,16 +1,21 @@
-"""Aris-owned synchronous simulation routes; nested wire types await Teguh review."""
+"""Aris-owned synchronous deterministic simulation API."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from pydantic import UUID4
 
 from app.api.response import ApiError, failure, success
-from app.services.simulation.engine import SimulationError
-from app.services.simulation.models import SimulationInput
+from app.core.security import Actor, require_idempotency_key, require_scope
+from app.schemas.shared import Envelope, ErrorDetail
+from app.services.simulation.engine import SimulationError, SupplierCatalog
+from app.services.simulation.models import SimulationInput, SimulationPage, SimulationWire
 from app.services.simulation.service import SimulationAccess, SimulationService
+from app.services.simulation.shared_repository import (
+    CreationContext, PersistedSimulationAccess, SharedSimulationRepository,
+)
 
 
 class SimulationRoute(APIRoute):
@@ -20,51 +25,70 @@ class SimulationRoute(APIRoute):
         async def wrapped(request: Request):
             try:
                 return await handler(request)
-            except RequestValidationError:
-                return simulation_error(SimulationError("Invalid simulation input"), request)
+            except RequestValidationError as exc:
+                errors = exc.errors()
+                # Schema/transport errors use Appendix B's 400. Invalid scenario
+                # parameters and missing versions use the user's explicit 422 rule.
+                structural = any(
+                    e["type"] in {"extra_forbidden", "json_invalid", "model_attributes_type"}
+                    or e["loc"][0] in {"path", "query"}
+                    or len(e["loc"]) == 1
+                    or "finding_id" in e["loc"]
+                    for e in errors
+                )
+                error = ApiError(
+                    400 if structural else 422,
+                    "VALIDATION_ERROR" if structural else "SIMULATION_INPUT_INVALID",
+                    "Invalid simulation request" if structural else "Invalid simulation scenario",
+                    details=[ErrorDetail(field=".".join(map(str, e["loc"])), reason="Invalid or unknown field") for e in errors],
+                )
+                return failure(error, request.state.request_id)
             except SimulationError as exc:
-                return simulation_error(exc, request)
+                return failure(ApiError(exc.status_code, exc.code, str(exc)), request.state.request_id)
 
         return wrapped
 
 
-def simulation_error(exc: SimulationError, request: Request) -> JSONResponse:
-    return failure(
-        ApiError(exc.status_code, exc.code, str(exc)), request.state.request_id,
+def get_simulation_service(request: Request) -> SimulationService:
+    return SimulationService(
+        SharedSimulationRepository(request.app.state.session_factory), SupplierCatalog.packaged(),
     )
 
 
-def get_simulation_service(request: Request) -> SimulationService:
-    service = getattr(request.app.state, "simulation_service", None)
-    if service is None:
-        raise SimulationError("Simulation storage is not configured",
-                              code="SIMULATION_UNAVAILABLE", status_code=503)
-    return service
-
-
 def get_simulation_access(request: Request) -> SimulationAccess:
-    access = getattr(request.state, "simulation_access", None)
-    if access is None:
-        raise SimulationError("Trusted simulation authorization is not configured",
-                              code="SIMULATION_UNAVAILABLE", status_code=503)
-    return access
+    policy = getattr(request.state, "simulation_access", None)
+    if policy is None:
+        # Deployment configuration failure, not a new Appendix B business code.
+        raise ApiError(500, "INTERNAL_ERROR", "Trusted simulation authorization is not configured")
+    return PersistedSimulationAccess(request.app.state.session_factory, policy)
 
 
 router = APIRouter(tags=["simulations"], route_class=SimulationRoute)
 Service = Annotated[SimulationService, Depends(get_simulation_service)]
 Access = Annotated[SimulationAccess, Depends(get_simulation_access)]
+WriteActor = Annotated[Actor, Depends(require_scope("simulation:write"))]
+ReadActor = Annotated[Actor, Depends(require_scope("simulation:read"))]
+Key = Annotated[str, Depends(require_idempotency_key)]
 
 
-@router.post("/cases/{case_id}/simulations", status_code=201)
-def create_simulation(request: Request, case_id: UUID4, scenario: SimulationInput, service: Service, access: Access):
-    return success(service.create(case_id, scenario, access), request.state.request_id, status=201)
+@router.post("/cases/{case_id}/simulations", status_code=201, response_model=Envelope[SimulationWire])
+def create_simulation(request: Request, case_id: UUID4, scenario: SimulationInput,
+                      actor: WriteActor, key: Key, access: Access, service: Service):
+    context = CreationContext(actor, key, request.url.path, request.state.request_id)
+    body = service.create_response(case_id, scenario, access, context)
+    return JSONResponse(body, status_code=201)
 
 
-@router.get("/cases/{case_id}/simulations")
-def list_simulations(request: Request, case_id: UUID4, service: Service, access: Access):
-    return success(service.list_for_case(case_id, access), request.state.request_id)
+@router.get("/cases/{case_id}/simulations", response_model=Envelope[SimulationPage])
+def list_simulations(request: Request, case_id: UUID4, actor: ReadActor,
+                     access: Access, service: Service,
+                     limit: Annotated[int, Query(ge=1)] = 20,
+                     offset: Annotated[int, Query(ge=0)] = 0):
+    return success(service.list_page(case_id, access, limit, offset), request.state.request_id)
 
 
-@router.get("/simulations/{simulation_id}")
-def get_simulation(request: Request, simulation_id: UUID4, service: Service, access: Access):
-    return success(service.detail(simulation_id, access), request.state.request_id)
+@router.get("/simulations/{simulation_id}", response_model=Envelope[SimulationWire])
+def get_simulation(request: Request, simulation_id: UUID4, actor: ReadActor,
+                   access: Access, service: Service):
+    record = service.detail(simulation_id, access)
+    return success(service.wire_record(record), request.state.request_id)

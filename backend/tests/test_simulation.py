@@ -20,10 +20,10 @@ from app.services.simulation.models import SimulationInput, SupplierDataset
 from app.services.simulation.repository import SimulationRepository
 from app.services.simulation.service import SimulationService
 
-CASE_ID = uuid4()
-FINDING_ID = uuid4()
-OTHER_CASE_ID = uuid4()
-OTHER_FINDING_ID = uuid4()
+CASE_ID = UUID("11111111-1111-4111-8111-111111111111")
+FINDING_ID = UUID("22222222-2222-4222-8222-222222222222")
+OTHER_CASE_ID = UUID("33333333-3333-4333-8333-333333333333")
+OTHER_FINDING_ID = UUID("44444444-4444-4444-8444-444444444444")
 GOLDEN = {
     "baseline": {"eligible_supplier_count": 1, "lowest_total_offer_idr": 825000000},
     "alternative": {"eligible_supplier_count": 3, "lowest_total_offer_idr": 660000000},
@@ -48,11 +48,11 @@ class TestAccess:
 
     def require_case(self, case_id):
         if case_id not in self.allowed_cases:
-            raise SimulationError("Access denied", code="SIMULATION_ACCESS_DENIED", status_code=403)
+            raise SimulationError("Access denied", code="FORBIDDEN", status_code=403)
 
     def require_finding(self, case_id, finding_id):
         if self.findings.get(finding_id) != case_id:
-            raise SimulationError("Finding is unavailable for case", code="SIMULATION_ACCESS_DENIED", status_code=403)
+            raise SimulationError("Finding is unavailable for case", code="FORBIDDEN", status_code=403)
 
 
 @pytest.fixture
@@ -66,14 +66,10 @@ def setup_service(tmp_path):
 
 
 @pytest.fixture
-def api(setup_service):
-    service, _ = setup_service
-    access = TestAccess()
-    app = create_app()
-    app.state.simulation_service = service
-    app.dependency_overrides[get_simulation_access] = lambda: access
-    with TestClient(app) as client:
-        yield client, service, access
+def api(tmp_path):
+    from test_simulation_shared import make_api
+    with make_api(tmp_path, CASE_ID, FINDING_ID, OTHER_CASE_ID, OTHER_FINDING_ID, TestAccess()) as values:
+        yield values[:3]
 
 
 def test_golden_fixture_manifest_and_repeatability():
@@ -91,7 +87,7 @@ def test_golden_fixture_manifest_and_repeatability():
     assert hashlib.sha256(raw).hexdigest() == fixture.sha256
     scenario = SimulationInput.model_validate(payload())
     assert evaluate(scenario, dataset) == GOLDEN
-    assert ENGINE_VERSION == "simulation-engine-v1"
+    assert ENGINE_VERSION == "supplier-eligibility-v1"
     reordered = dict(reversed(list(payload().items())))
     normalized = SimulationInput.model_validate(reordered)
     assert canonical_json(scenario.model_dump(mode="json")) == canonical_json(normalized.model_dump(mode="json"))
@@ -161,13 +157,13 @@ def test_api_create_list_detail_and_no_mutation_routes(api):
     assert body["meta"]["api_version"] == "v1"
     record = body["data"]
     assert record["result"] == GOLDEN
-    assert client.get(url).json()["data"] == [record]
+    assert client.get(url).json()["data"]["items"] == [record]
     detail_url = f"/api/v1/simulations/{record['simulation_id']}"
     assert client.get(detail_url).json()["data"] == record
     assert client.patch(detail_url, json={"baseline": {"minimum_ram_gb": 16}}).status_code == 405
     assert client.delete(detail_url).status_code == 405
     assert client.get(detail_url).json()["data"] == record
-    assert client.get(f"/api/v1/cases/{OTHER_CASE_ID}/simulations").json()["data"] == []
+    assert client.get(f"/api/v1/cases/{OTHER_CASE_ID}/simulations").json()["data"]["items"] == []
     schema = client.get("/openapi.json").json()
     assert set(schema["paths"][detail_url.rsplit("/", 1)[0] + "/{simulation_id}"]) == {"get"}
 
@@ -186,12 +182,13 @@ def test_api_create_list_detail_and_no_mutation_routes(api):
 def test_invalid_requests_have_stable_error_and_no_writes(api, changes):
     client, service, _ = api
     response = client.post(f"/api/v1/cases/{CASE_ID}/simulations", json=payload(**changes))
-    assert response.status_code == 422
+    structural = any(k in changes for k in ("suppliers", "unit_price_idr", "quantity", "operator", "finding_id")) or "operator" in changes.get("baseline", {})
+    assert response.status_code == (400 if structural else 422)
     body = response.json()
     Envelope[dict].model_validate(body)
     assert body["success"] is False and body["data"] is None
-    assert body["error"]["code"] == "SIMULATION_INPUT_INVALID"
-    assert body["error"]["details"] == [] and body["error"]["retryable"] is False
+    assert body["error"]["code"] == ("VALIDATION_ERROR" if structural else "SIMULATION_INPUT_INVALID")
+    assert isinstance(body["error"]["details"], list) and body["error"]["retryable"] is False
     assert body["meta"]["request_id"] == response.headers["X-Request-ID"]
     assert service.repository.list_for_case(CASE_ID) == []
 
@@ -200,18 +197,18 @@ def test_invalid_requests_have_stable_error_and_no_writes(api, changes):
 def test_missing_fields_and_wrong_body_type(api, body):
     client, _, _ = api
     response = client.post(f"/api/v1/cases/{CASE_ID}/simulations", json=body)
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "SIMULATION_INPUT_INVALID"
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_invalid_json_and_ids(api):
     client, _, _ = api
     response = client.post(f"/api/v1/cases/{CASE_ID}/simulations", content="{", headers={"Content-Type": "application/json"})
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "SIMULATION_INPUT_INVALID"
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
     for url in ("/api/v1/cases/not-a-uuid/simulations", "/api/v1/simulations/not-a-uuid"):
-        assert client.get(url).status_code == 422
-        assert client.get(url).json()["error"]["code"] == "SIMULATION_INPUT_INVALID"
+        assert client.get(url).status_code == 400
+        assert client.get(url).json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_case_finding_and_read_authorization(api):
@@ -240,15 +237,13 @@ def test_missing_simulation_and_unconfigured_integration(api):
     client, service, _ = api
     missing = client.get(f"/api/v1/simulations/{uuid4()}")
     assert missing.status_code == 404
-    assert missing.json()["error"]["code"] == "SIMULATION_NOT_FOUND"
+    assert missing.json()["error"]["code"] == "RESOURCE_NOT_FOUND"
     app = create_app()
     with TestClient(app) as unconfigured:
-        assert unconfigured.post(f"/api/v1/cases/{CASE_ID}/simulations", json=payload()).status_code == 503
-        app.state.simulation_service = service
-        # Browser identity headers and payloads never create a trusted access adapter.
+        assert unconfigured.post(f"/api/v1/cases/{CASE_ID}/simulations", json=payload()).status_code == 401
         response = unconfigured.get(f"/api/v1/cases/{CASE_ID}/simulations", headers={"X-Actor-Id": str(uuid4())})
-        assert response.status_code == 503
-        assert response.json()["error"]["code"] == "SIMULATION_UNAVAILABLE"
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "AUTHENTICATION_REQUIRED"
 
 
 @pytest.mark.parametrize("field,value", [
@@ -320,3 +315,17 @@ def test_fixture_checksum_detects_modified_bytes(monkeypatch):
     monkeypatch.setattr("app.services.simulation.engine.files", lambda name: ModifiedResource())
     with pytest.raises(SimulationError, match="integrity"):
         SupplierCatalog.packaged()
+
+
+@pytest.mark.parametrize("baseline,alternative,count_delta,price_delta,verb", [
+    (16, 32, -2, 165000000, "reduces"),
+    (16, 16, 0, 0, "preserves"),
+])
+def test_reverse_and_unchanged_scenarios(baseline, alternative, count_delta, price_delta, verb):
+    dataset = SupplierCatalog.packaged().get("synthetic-suppliers-v1")
+    request = SimulationInput.model_validate(payload(
+        baseline={"minimum_ram_gb": baseline}, alternative={"minimum_ram_gb": alternative},
+    ))
+    result = evaluate(request, dataset)
+    assert result["delta"] == {"eligible_supplier_count": count_delta, "lowest_total_offer_idr": price_delta}
+    assert interpret(result).startswith(f"The alternative {verb} synthetic eligibility.")

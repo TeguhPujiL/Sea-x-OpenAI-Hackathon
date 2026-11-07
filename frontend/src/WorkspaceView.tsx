@@ -13,6 +13,7 @@ import { VendorDecisionSummary } from "./VendorDecisionSummary";
 import { RepairEvidence } from "./RepairEvidence";
 import type { UploadItem } from "./uploads";
 import type { ProcurementDecision } from "./procurementConclusion";
+import { activeProcurementStatus, ProcurementDecisionStatus } from "./ProcurementDecisionStatus";
 
 export const idr = (amount: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amount);
 const human = (text: string) => text.replaceAll("_", " ").toLowerCase();
@@ -92,6 +93,7 @@ export function WorkspaceView(p: ViewProps) {
       {p.historyPanel}
       {p.historyStorageWarning && <p className="notice warning-notice">Recent case history could not be saved in this browser. Available cases can still be loaded from the server.</p>}
       <section className="context-bar" aria-label="Persistent case context"><div className="case-summary"><span className="context-label">ACTIVE CASE</span><strong>{c?.title ?? "No case created"}</strong><span>{c?.case_number ?? "Create a case or resume with a case ID"}</span></div><div><span className="context-label">CASE STATUS</span>{c ? <Status value={c.case_status} /> : <span>Not started</span>}</div><div><span className="context-label">ASSURANCE</span>{c ? <Status value={c.assurance_status} /> : <span>Awaiting case</span>}</div><div><span className="context-label">VERSION</span><strong>{c ? `v${c.version}` : "—"}</strong></div>{c && <code className="case-id">{c.case_id}</code>}</section>
+      {c && <section className="notice info-notice" aria-label="Saved procurement decision"><strong>Procurement decision</strong><ProcurementDecisionStatus status={activeProcurementStatus(r)} /><p className="muted">Internal review outcome; the case and assurance statuses above retain their recorded workflow values.</p></section>}
       <nav className="stepper" aria-label="Case journey"><ol>{steps.map((name, i) => <li key={name}><button aria-current={p.step === i ? "step" : undefined} onClick={() => p.onStep(i)} disabled={!!p.busy || p.restoring} className={p.step === i ? "step active" : "step"}><span className="step-number">{String(i + 1).padStart(2, "0")}</span><span>{name}</span></button></li>)}</ol></nav>
       <div className="status-line" role="status" aria-live="polite"><span className={`status-dot ${p.busy || p.restoring ? "working" : ""}`} /><span>{p.restoring ? "Recovering authoritative case resources…" : p.busy ? `${p.busy}…` : p.pollState ?? "Workspace ready"}</span><span className="health-status">{p.healthMessage}</span></div>
       {p.demoMode === true && <div className="notice info-notice">Backend demo identity is enabled. Actor and reviewer identity are derived by the server.</div>}

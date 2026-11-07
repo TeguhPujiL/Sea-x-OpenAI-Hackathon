@@ -17,6 +17,9 @@ from .schemas import FindingScenarioCreate, FindingScenarioView
 from .service import create_scenario, ensure_migrated, scenario_data
 from .vendor_summary import vendor_summary
 from .conclusions import ConclusionCreate, create_conclusion, get_conclusion
+from .conclusion_validation import ConclusionValidationRoute
+
+conclusion_router = APIRouter(route_class=ConclusionValidationRoute)
 
 router = APIRouter(tags=["experimental-finding-scenarios"], responses={
     status: {"description": f"PROPOSED-v1.2 experimental failure: {code}"} for status, code in {
@@ -73,7 +76,7 @@ def get_vendor_summary(case_id: UUID4, analysis_job_id: UUID4, request: Request,
         return label(success(vendor_summary(db, actor, case_id, analysis_job_id), request.state.request_id))
 
 
-@router.get("/cases/{case_id}/procurement-conclusions",
+@conclusion_router.get("/cases/{case_id}/procurement-conclusions",
     description="PROPOSED-v1.2 immutable internal conclusion for one assessment; no v1.1 case approval.")
 def read_procurement_conclusion(case_id: UUID4, analysis_job_id: UUID4, request: Request,
                                actor: Annotated[Actor, Depends(require_scope("review:read"))]):
@@ -85,7 +88,7 @@ def read_procurement_conclusion(case_id: UUID4, analysis_job_id: UUID4, request:
         return label(success(get_conclusion(db, actor, case_id, analysis_job_id), request.state.request_id))
 
 
-@router.post("/cases/{case_id}/procurement-conclusions", status_code=201,
+@conclusion_router.post("/cases/{case_id}/procurement-conclusions", status_code=201,
     description="PROPOSED-v1.2 local internal GO/NO_GO conclusion; does not approve or close the v1.1 case.")
 def record_procurement_conclusion(case_id: UUID4, payload: ConclusionCreate, request: Request,
                                   actor: Annotated[Actor, Depends(require_scope("review:decide"))],
@@ -95,3 +98,6 @@ def record_procurement_conclusion(case_id: UUID4, payload: ConclusionCreate, req
     if request.query_params:
         raise ApiError(400, "VALIDATION_ERROR", "Unknown query field")
     return label(create_conclusion(request, actor, case_id, payload, key))
+
+
+router.include_router(conclusion_router)

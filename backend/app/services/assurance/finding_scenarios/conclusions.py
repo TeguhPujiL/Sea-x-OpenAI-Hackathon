@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 from fastapi import Depends, Request
 from pydantic import Field, StrictBool, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, event, inspect, select
 from sqlalchemy.orm import Session
 
@@ -69,8 +70,8 @@ class ConclusionCreate(StrictModel):
     @classmethod
     def meaningful(cls, value):
         value = value.strip()
-        if len(value) < 20 or len(value.split()) < 4 or len(set(value.lower())) < 8:
-            raise ValueError("Explain the procurement decision in at least four words and 20 characters")
+        if len(value) < 20 or len(value.split()) < 4:
+            raise PydanticCustomError("decision_reason_minimum", "Use at least 20 characters and four words for the decision reason")
         return value
 
     @model_validator(mode="after")

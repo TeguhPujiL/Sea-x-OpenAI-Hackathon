@@ -14,13 +14,10 @@ export function FinalProcurementDecision({ resources, selectedVendorId, selected
   const trimmedReason = reason.trim();
   const characterCount = Array.from(trimmedReason).length;
   const wordCount = trimmedReason ? trimmedReason.split(/\s+/).length : 0;
-  // Mirror the backend's meaningful-reason policy so a visibly valid form
-  // cannot fail its repetition check only after submission.
+  // Match the backend's format requirements. Repeated/filler words are allowed.
   const reasonIssue = characterCount < 20 || wordCount < 4
     ? "Write at least 20 characters and four words explaining your decision."
-    : new Set(trimmedReason.toLowerCase()).size < 8
-      ? "Add a more specific explanation; the reason is too repetitive."
-      : null;
+    : null;
   const conclusion = resources.procurementConclusion;
   const ready = resources.procurementConclusion !== undefined && !resources.procurementConclusionError && !!resources.job?.result;
   const decisionIssues = [reasonIssue,

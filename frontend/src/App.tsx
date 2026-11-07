@@ -253,7 +253,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
       polling.current?.abort(); restoration.current?.abort(); setPollState(null); updateUploads([]);
       changeIds(next); commit({ ...emptyResources(), caseResource: value }); adoptText("");
       const jobs = await listAll(client, `/cases/${next.case_id}/jobs`, decodeJob);
-      const latest = [...jobs].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+      const latest = [...jobs].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.job_id.localeCompare(a.job_id))[0];
       if (latest && latest.case_id !== next.case_id) throw new ShapeError("Cross-case job rejected.");
       next.analysis_job_id = latest?.job_id ?? null; changeIds(next);
       const restored = await restoreCaseResources(client, next); const loaded = restored.resources; applyLoaded(loaded, restored.ids); setStep(recoveredStep(loaded)); setHistoryOpen(false);
@@ -473,6 +473,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
           try { window.sessionStorage.removeItem(`procuremind.vendor-preference.${preferenceScope}`); } catch { setStorageWarning(true); }
         }
         await readAssurance();
+        if (historyOpen) await loadHistory();
       }, snapshot.caseResource?.version);
     }}
     onAnalyze={() => {

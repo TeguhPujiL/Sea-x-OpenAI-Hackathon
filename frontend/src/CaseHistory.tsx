@@ -3,6 +3,7 @@ import type { CaseResource } from "./contracts";
 import { caseHistoryPage } from "./history";
 import { latestActivity, stepActivity, type HistoryActivity } from "./historyActivity";
 import { Timestamp } from "./Timestamp";
+import { ProcurementDecisionStatus } from "./ProcurementDecisionStatus";
 export function CaseHistory({ cases, activity = {}, recentIds, activeId, loading, error, disabled, onOpen, onRefresh, onClose, onDelete }: {
   cases: CaseResource[]; recentIds: string[]; activeId: string | null; loading: boolean;
   activity?: HistoryActivity;
@@ -26,7 +27,9 @@ export function CaseHistory({ cases, activity = {}, recentIds, activeId, loading
     <p className="muted">Most recently updated cases appear first, with 5 cases per page. Ordering includes recorded workflow activity. Times use your local time zone; hover to see the saved UTC timestamp.</p>
     {loading ? <p role="status">Loading case history…</p> : error ? <p role="alert" className="inline-warning">{error}</p> : !items.length ? <p>No matching cases available.</p> :
       <ul className="history-list">{items.map(c => <li key={c.case_id}><div><strong>{c.title}</strong><p>{c.case_number} · {c.case_status.replaceAll("_", " ").toLowerCase()}{recentIds.includes(c.case_id) ? " · Recently opened" : ""}</p><p className="history-updated">Last updated: <Timestamp value={c.updated_at} /></p><code>{c.case_id}</code></div>
-        <div className="history-activity"><p><strong>{activity[c.case_id] && !activity[c.case_id].error ? "Latest activity" : "Case updated"}</strong><br /><Timestamp value={latestActivity(c, activity[c.case_id])} /></p>
+        <div className="history-activity"><ProcurementDecisionStatus status={activity[c.case_id]?.procurementStatus ?? {
+          state: "UNAVAILABLE", detail: activity[c.case_id]?.error ?? "Refresh cases to load the saved decision status.",
+        }} /><p><strong>{activity[c.case_id] && !activity[c.case_id].error ? "Latest activity" : "Case updated"}</strong><br /><Timestamp value={latestActivity(c, activity[c.case_id])} /></p>
           <details><summary>Step timestamps</summary>
             {!activity[c.case_id] || activity[c.case_id].error ? <p role="status">Step history unavailable. {activity[c.case_id]?.error ?? "Refresh cases to load recorded activity."}</p> :
               <ol className="history-steps">{stepActivity(activity[c.case_id]).map((step, index) => <li key={step.name}><strong>{String(index + 1).padStart(2, "0")} · {step.name}</strong>

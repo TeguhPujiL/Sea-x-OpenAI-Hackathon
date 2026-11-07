@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createClient, RequestError, TransportError, readConfig, normalize, requiresIdempotency } from "../src/api.ts";
-import { decodeCase, decodeDocument, decodeJob, decodeFinding, decodeChallenge, decodeSimulation, decodeRepair, decodeReview, decodeEnvelope, ShapeError, uuid } from "../src/contracts.ts";
+import { decodeCase, decodeDocument, decodeJob, decodeFinding, decodeChallenge, decodeSimulation, decodeRepair, decodeReview, decodeAudit, decodeEnvelope, ShapeError, uuid } from "../src/contracts.ts";
 import { emptyIds, emptyResources, saveIds, readIds, storageKey, hasRequiredDocuments, pollJob, cleanCase, canReview, recoveredStep } from "../src/workflow.ts";
 import { loadWorkspace, listAll } from "../src/resources.ts";
 import { WorkspaceView, ErrorPanel } from "../src/WorkspaceView.tsx";
@@ -180,9 +180,60 @@ test("all six steps, labelled controls, skip link and current-step semantics are
   assert.match(html, /aria-live="polite"/); assert.match(html, /Synthetic data/); assert.match(html, /statutory procurement approval/);
 });
 test("recorded review is immutable UI and preserves server reviewer/audit provenance", () => {
-  const resources = fullResources(); resources.repair.status = "APPROVED"; resources.reviews = [reviewResource()]; resources.audit = [auditResource()];
+  const resources = fullResources(); resources.repair.status = "APPROVED"; resources.reviews = [reviewResource()]; resources.audit = [{ ...auditResource(), event_hash: "test-only-event-hash" }];
   const html = view({ resources, ids: fullIds(), step: 5 }); assert.match(html, /Synthetic test reviewer/); assert.match(html, new RegExp(IDs.actor)); assert.match(html, /Audit timeline/); assert.match(html, /test-only-event-hash/);
   assert.doesNotMatch(html, /<select name="decision"/); assert.doesNotMatch(html, /Record internal review<\/button>/); assert.equal(canReview(resources), false);
+});
+
+test("audit accepts explicit null hashes from the backend without fabricating provenance", () => {
+  const audit = { ...auditResource(), previous_hash: null, event_hash: null };
+  assert.deepEqual(decodeAudit(audit), audit);
+  const hashed = { ...audit, previous_hash: "stored-previous-hash", event_hash: "stored-event-hash" };
+  assert.deepEqual(decodeAudit(hashed), hashed);
+});
+
+for (const field of ["previous_hash", "event_hash"]) {
+  test(`audit still rejects missing or malformed ${field}`, () => {
+    for (const value of [undefined, 123, false, {}, []]) {
+      assert.throws(() => decodeAudit({ ...auditResource(), [field]: value }),
+        new RegExp(`audit\\.${field} does not match API Contract v1.1`));
+    }
+  });
+}
+
+test("audit permits unknown historical actor labels without relaxing review identity", () => {
+  const audit = { ...auditResource(), actor: { actor_id: IDs.actor, display_name: null, role: null } };
+  assert.deepEqual(decodeAudit(audit), audit);
+  for (const actor of [{ ...audit.actor, actor_id: null }, { ...audit.actor, display_name: 12 }, { ...audit.actor, role: false }]) {
+    assert.throws(() => decodeAudit({ ...audit, actor }), /audit.actor/);
+  }
+  assert.throws(() => decodeReview({ ...reviewResource(), reviewer: audit.actor }), /review.reviewer/);
+});
+
+test("06 Assure refresh loads unchained audit history and renders its missing provenance", async () => {
+  const backend = fixtureBackend();
+  backend.state.caseResource = caseResource();
+  backend.state.job = jobResource();
+  backend.state.finding = findingResource();
+  backend.state.polls = 2;
+  backend.state.repair = { ...repairResource(), status: "SUBMITTED" };
+  backend.state.reviews = [reviewResource()];
+  backend.state.audit = [{ ...auditResource(), previous_hash: null, event_hash: null,
+    actor: { actor_id: IDs.actor, display_name: null, role: null } }];
+  const restored = await loadWorkspace(createClient(config, backend.fetcher), {
+    ...emptyIds(), case_id: IDs.case, analysis_job_id: IDs.job,
+    selected_finding_id: IDs.finding, repair_proposal_id: IDs.repair,
+  });
+  assert.equal(restored.reviews.length, 1);
+  assert.equal(restored.audit[0].event_hash, null);
+  assert.equal(recoveredStep(restored), 5);
+  const html = view({ resources: restored, step: 5 });
+  assert.match(html, /Recorded internal review/);
+  assert.match(html, /Audit timeline/);
+  assert.match(html, /Event hash: <code>Not recorded<\/code>/);
+  assert.match(html, /Actor name not recorded/);
+  assert.match(html, new RegExp(`Actor ID: <code>${IDs.actor}</code>`));
+  assert.doesNotMatch(html, /test-only-event-hash|does not match API Contract/);
 });
 test("complete synthetic contract journey, stale repair, and authoritative refresh recovery", async () => {
   const backend = fixtureBackend(); const client = createClient(config, backend.fetcher);

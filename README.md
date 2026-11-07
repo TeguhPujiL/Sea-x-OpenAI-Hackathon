@@ -50,7 +50,7 @@ $env:Path = $nodeDirectory + ';' + $env:Path
 .\.venv\Scripts\python.exe -m app.core.init_db
 ```
 
-The application never creates tables on startup. For this branch, initialize a new database with `python -m app.services.assurance.migrate`. The historical init_db command uses create_all only as an empty foundation demo bootstrap; it cannot install assurance guards. Existing unversioned databases require a reviewed adoption migration. Relative SQLite paths resolve from the process working directory, so run from the repository root. Production integration requires Teguh's migration review.
+The application never creates tables on startup. For this branch, initialize a new database with `python -m app.services.assurance.migrate`. The historical init_db command uses create_all only as an empty foundation demo bootstrap; it cannot install assurance guards. Existing unversioned databases require a reviewed adoption migration. Relative SQLite paths resolve from the process working directory, so run from the repository root. Production integration requires the integration lead's migration review.
 
 ## Shared contract and identity
 
@@ -60,22 +60,22 @@ Demo identity is disabled by default. Enable PROCUREMIND_DEMO_MODE only with a b
 
 The shared model module declares 14 tables and foreign keys, status/version/money/page constraints and idempotency uniqueness. SQLite triggers and an ORM guard reject mutation of persisted AI executions, simulations, reviews and audit events. Assurance adds explicit versioned migrations and atomic review/case/audit/idempotency writes. Simulation persists deterministic results, audit and idempotency atomically in those shared tables. Other owners must integrate their commands with the audit transaction primitive. No live AI execution or PDF extraction command is provided on this branch.
 
-PyMuPDF and OpenAI SDK dependencies and backend-only provider/model configuration are prepared for Teguh's feature implementation. Schema-constrained AI calls and their output validation are not pre-implemented. Secrets and raw documents are never logged by the scaffold.
+PyMuPDF and OpenAI SDK dependencies and backend-only provider/model configuration are prepared for backend feature implementation. Schema-constrained AI calls and their output validation are not pre-implemented. Secrets and raw documents are never logged by the scaffold.
 
 ## Contract, ownership and results
 
 - [Contract lock and exact endpoint table](docs/CONTRACT_LOCK.md): 36 business method/path pairs and codes, 12 enums, 16 Appendix B codes, canonical envelopes, headers and concurrency.
 - [Source-backed machine snapshot](docs/contract_snapshot.json) and [foundation OpenAPI](docs/openapi.foundation.json): the latter exposes only health.
-- [Ownership](docs/OWNERSHIP.md): Frontend Lead owns frontend/src; Teguh owns core/shared and AI/document/business integration; Aris owns simulation; Fazhima owns review/audit/assurance QA. Shared models/schemas require Teguh review.
+- [Ownership](docs/OWNERSHIP.md): Frontend Lead owns frontend/src; The Backend Lead owns core/shared and AI/document/business integration; Aris owns simulation; Fazhima owns review/audit/assurance QA. Shared models/schemas require Backend Lead review.
 - [Gaps](docs/CONTRACT_GAPS.md): no APPROVE_CASE or fake repair for clean cases; separate contract 660M/690M/825M fixture from negative-pack 710M/835M/680M. All corrections stay PROPOSED. Challenge readiness and signed-delta conflicts remain explicit.
 - [Verification results](docs/VERIFICATION.md) and [exact file inventory](docs/FOUNDATION_FILES.md).
-- [Assurance implementation and QA report](docs/ASSURANCE_QA_REPORT.md), [operational policy and Teguh handoff](docs/ASSURANCE_INTEGRATION.md), and [assurance-only OpenAPI snapshot](docs/openapi.assurance.json). The assurance report/snapshot describe the pre-merge branch; use [dev verification](docs/DEV_MERGE_VERIFICATION.md) and runtime /openapi.json for the integrated state. The foundation documents above describe the earlier baseline.
+- [Assurance implementation and QA report](docs/ASSURANCE_QA_REPORT.md), [operational policy and backend handoff](docs/ASSURANCE_INTEGRATION.md), and [assurance-only OpenAPI snapshot](docs/openapi.assurance.json). The assurance report/snapshot describe the pre-merge branch; use [dev verification](docs/DEV_MERGE_VERIFICATION.md) and runtime /openapi.json for the integrated state. The foundation documents above describe the earlier baseline.
 
 The foundation is ready for owner handoff; it is not the completed P0 workflow or a full API contract regression pass.
 
-## Teguh backend merge
+## Backend integration
 
-Prompt A/B backend is merged from teguh 22569a3. Run the explicit `python -m app.core.migrations` upgrade before serving. See [decision handoff](docs/TEGUH_DECISION_HANDOFF.md) and [phase-A handoff](docs/TEGUH_P0_HANDOFF.md). Existing frontend and Simulation/Review/Audit modules are retained. The backend model default remains gpt-6.1-sol as configured on dev.
+Prompt A/B backend is integrated at commit 22569a3. Run the explicit `python -m app.core.migrations` upgrade before serving. See [backend integration verification](docs/DEV_MERGE_VERIFICATION.md). Existing frontend and Simulation/Review/Audit modules are retained. The backend model default remains gpt-6.1-sol as configured on dev.
 
 ## Run the public demo
 
@@ -160,13 +160,13 @@ Demo identity is disabled by default. Enable PROCUREMIND_DEMO_MODE only with a b
 
 The shared model module declares 14 tables and foreign keys, status/version/money/page constraints and idempotency uniqueness. SQLite triggers and an ORM guard reject mutation of persisted AI executions, simulations, reviews and audit events. Database owners still implement migrations, complete workflow constraints, JSON validation and atomic business/audit/idempotency writes. No simulator, AI execution, PDF extraction, human review or audit command is provided.
 
-PyMuPDF and OpenAI SDK dependencies and backend-only provider/model configuration are prepared for Teguh's feature implementation. Schema-constrained AI calls and their output validation are not pre-implemented. Secrets and raw documents are never logged by the scaffold.
+PyMuPDF and OpenAI SDK dependencies and backend-only provider/model configuration are prepared for backend feature implementation. Schema-constrained AI calls and their output validation are not pre-implemented. Secrets and raw documents are never logged by the scaffold.
 
 ## Contract, ownership and results
 
 - [Contract lock and exact endpoint table](docs/CONTRACT_LOCK.md): 36 business method/path pairs and codes, 12 enums, 16 Appendix B codes, canonical envelopes, headers and concurrency.
 - [Source-backed machine snapshot](docs/contract_snapshot.json) and [foundation OpenAPI](docs/openapi.foundation.json): the latter exposes only health.
-- [Ownership](docs/OWNERSHIP.md): Frontend Lead owns frontend/src; Teguh owns core/shared and AI/document/business integration; Aris owns simulation; Fazhima owns review/audit/assurance QA. Shared models/schemas require Teguh review.
+- [Ownership](docs/OWNERSHIP.md): Frontend Lead owns frontend/src; The Backend Lead owns core/shared and AI/document/business integration; Aris owns simulation; Fazhima owns review/audit/assurance QA. Shared models/schemas require Backend Lead review.
 - [Gaps](docs/CONTRACT_GAPS.md): no APPROVE_CASE or fake repair for clean cases; separate contract 660M/690M/825M fixture from negative-pack 710M/835M/680M. All corrections stay PROPOSED. Challenge readiness and signed-delta conflicts remain explicit.
 - [Verification results](docs/VERIFICATION.md) and [exact file inventory](docs/FOUNDATION_FILES.md).
 

@@ -6,6 +6,7 @@ import { readCaseHistory, rememberCase, orderCases, caseHistoryPage, caseHistory
 import { newUploadItems, uploadBatch } from "../src/uploads.ts";
 import { CaseHistory } from "../src/CaseHistory.tsx";
 import { DocumentUploads, DocumentTypeEditor } from "../src/DocumentUploads.tsx";
+import { saveDocumentTypes } from "../src/documentTypes.ts";
 import { LoginForm } from "../src/AuthGate.tsx";
 import { createClient } from "../src/api.ts";
 import { restoreCaseResources } from "../src/resources.ts";
@@ -31,8 +32,8 @@ test("recent case history stores only valid identifiers and stays ordered across
   assert.equal(rememberCase({ getItem() { throw Error(); }, setItem() { throw Error(); } }, IDs.case).saved, false);
 });
 test("case history renders current backend metadata and an accessible reopen control", () => {
-  const html = renderToStaticMarkup(React.createElement(CaseHistory, { cases: [caseResource()], recentIds: [IDs.case], activeId: null, loading: false, error: null, disabled: false, onOpen: noop, onRefresh: noop, onClose: noop }));
-  assert.match(html, /Case history/); assert.match(html, /Synthetic frontend integration test/); assert.match(html, /Open case/); assert.match(html, /Recently opened/);
+  const html = renderToStaticMarkup(React.createElement(CaseHistory, { cases: [caseResource()], recentIds: [IDs.case], activeId: null, loading: false, error: null, disabled: false, onOpen: noop, onDelete: noop, onRefresh: noop, onClose: noop }));
+  assert.match(html, /Delete case/); assert.match(html, /Case history/); assert.match(html, /Synthetic frontend integration test/); assert.match(html, /Open case/); assert.match(html, /Recently opened/);
 });
 test("multiple uploads use one contracted multipart request and unique key per PDF", async () => {
   const requests = [];
@@ -78,8 +79,8 @@ test("cross-case upload responses stop the batch without inventing documents", a
 test("file selection permits multiple PDFs and types can be assigned after upload", () => {
   const html = renderToStaticMarkup(React.createElement(DocumentUploads, { disabled: false, items: [], onUpload: noop, onRetry: noop, onClear: noop }));
   assert.match(html, /multiple=""/); assert.match(html, /Upload selected PDFs/); assert.doesNotMatch(html, /name="document_type"/);
-  const editor = renderToStaticMarkup(React.createElement(DocumentTypeEditor, { document: documentResource("OTHER"), disabled: false, onSave: noop }));
-  assert.match(editor, /Save document type/); assert.match(editor, /TECHNICAL_SPECIFICATION/);
+  const editor = renderToStaticMarkup(React.createElement(DocumentTypeEditor, { document: documentResource("OTHER"), disabled: false, onChange: noop }));
+  assert.doesNotMatch(editor, /<button/); assert.match(editor, /TECHNICAL_SPECIFICATION/);
 });
 test("login form masks passwords and does not contain a default password", () => {
   const html = renderToStaticMarkup(React.createElement(LoginForm, { busy: false, error: null, onLogin: async () => {} }));
@@ -129,8 +130,38 @@ test("category, search and recently opened filters combine and clamp pagination"
 });
 test("case history renders category options, page controls and only five rows", () => {
   const html = renderToStaticMarkup(React.createElement(CaseHistory, { cases: historyCases(), recentIds: [], activeId: null,
-    loading: false, error: null, disabled: false, onOpen: noop, onRefresh: noop, onClose: noop }));
+    loading: false, error: null, disabled: false, onOpen: noop, onDelete: noop, onRefresh: noop, onClose: noop }));
   assert.match(html, /All categories/); assert.match(html, /value="SERVICES"/);
   assert.match(html, /Page 1 of 3/); assert.match(html, /Next/);
   assert.equal((html.match(/>Open case<\/button>/g) ?? []).length, 5);
+});
+
+
+test("save document types sends only changed rows with their current versions", async () => {
+  const a = { ...documentResource("OTHER"), document_id: IDs.tor }, b = { ...documentResource("TECHNICAL_SPECIFICATION"), version: 3 };
+  const calls = [], saved = [];
+  const client = createClient(config, async (url, init) => {
+    calls.push({ url, ...init });
+    return Response.json(envelope({ ...a, document_type: "TOR", version: 2 }));
+  });
+  await saveDocumentTypes(client, [a,b], { [a.document_id]: "TOR", [b.document_id]: b.document_type }, d => saved.push(d), new AbortController().signal);
+  assert.equal(calls.length, 1); assert.equal(calls[0].method, "PATCH");
+  assert.deepEqual(JSON.parse(calls[0].body), { document_type: "TOR", expected_version: 1 });
+  assert.equal(saved[0].version, 2);
+});
+test("partial type-save conflict retains successful rows and stops without overwriting", async () => {
+  const a = { ...documentResource("OTHER"), document_id: IDs.tor }, b = { ...documentResource("OTHER"), document_id: IDs.spec }, c = { ...documentResource("OTHER"), document_id: IDs.actor };
+  let calls = 0; const saved = [];
+  const client = createClient(config, async () => {
+    if (++calls === 2) return Response.json(errorEnvelope("VERSION_CONFLICT", "Document changed"), { status: 409 });
+    return Response.json(envelope({ ...a, document_type: "TOR", version: 2 }));
+  });
+  await assert.rejects(saveDocumentTypes(client, [a,b,c], { [a.document_id]: "TOR", [b.document_id]: "TECHNICAL_SPECIFICATION", [c.document_id]: "TOR" }, d => saved.push(d), new AbortController().signal), error => error.body.code === "VERSION_CONFLICT");
+  assert.equal(calls, 2); assert.deepEqual(saved.map(d => d.document_id), [a.document_id]);
+});
+test("type save rejects cross-case responses before adopting server data", async () => {
+  const a = { ...documentResource("OTHER"), document_id: IDs.tor }; let saved = false;
+  const client = createClient(config, async () => Response.json(envelope({ ...a, case_id: IDs.actor, document_type: "TOR", version: 2 })));
+  await assert.rejects(saveDocumentTypes(client, [a], { [a.document_id]: "TOR" }, () => { saved = true; }, new AbortController().signal), /identity/);
+  assert.equal(saved, false);
 });

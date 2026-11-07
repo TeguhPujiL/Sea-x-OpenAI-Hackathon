@@ -151,3 +151,20 @@ text and recently-opened filters. Filter changes reset the page. Pagination clam
 when fewer results remain. Category options come from authorized backend cases;
 filtering/pagination are client-side over the existing paginated GET /cases data,
 without adding unsupported API query fields or caching case content locally.
+
+
+## Document type footer and case removal
+
+Document type controls edit local selections. A single **Save document types**
+button sits at the bottom next to **Continue to Assess**, sending existing
+PATCH /documents/{id} requests sequentially with each document's current version.
+Unchanged rows are skipped. Successful responses are applied immediately; a
+later failure stops the batch and retains the other choices. Version conflicts
+refresh authoritative resources before the user explicitly saves again. Continue
+and analysis are blocked until all pending selections are saved.
+
+History rows offer **Delete case** with confirmation and a reason, using the
+existing DELETE /cases/{id} request (reason, expected_version). Success removes
+that case from the visible history and local recent IDs, and clears the workspace
+if it was active. No new backend route or shared schema is introduced. Server
+scope/access checks, active-analysis/review protections and soft deletion apply.

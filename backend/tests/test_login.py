@@ -23,7 +23,7 @@ def login_app(tmp_path):
     static.mkdir()
     (static / "index.html").write_text("<html>Local test shell</html>")
     config = Settings(database_url=database_url, storage_root=tmp_path / "storage", demo_mode=True, demo_actor_id=uuid4(),
-                      demo_scopes=frozenset({"case:read", "case:write", "document:read", "document:write", "document:delete"}))
+                      demo_scopes=frozenset({"case:read", "case:write", "case:delete", "document:read", "document:write", "document:delete"}))
     app = create_web_app(config, static, LoginSettings(_env_file=None, username="admin", password=SecretStr(PASSWORD)))
     with TestClient(app) as client:
         yield app, client
@@ -157,3 +157,31 @@ def test_remove_uploaded_document_preserves_file_and_history(login_app):
         row = db.get(Document, UUID(did))
         assert row.deleted_at is not None
         assert (app.state.settings.storage_root / row.storage_key).read_bytes() == payload
+
+
+def test_delete_case_from_history_is_authorized_versioned_and_retained(login_app):
+    from uuid import UUID
+    from sqlalchemy import select
+    from app.models import Case, AuditEvent
+    app, client = login_app
+    assert sign_in(client).status_code == 200
+    created = client.post("/api/v1/cases", headers={"Idempotency-Key": "history-delete"}, json={
+        "title": "Synthetic disposable case", "category": "OTHER", "quantity": 1, "budget_ceiling_idr": 0})
+    case = created.json()["data"]
+    cid = case["case_id"]
+    payload = {"reason": "Created by mistake", "expected_version": case["version"] + 1}
+    stale = client.request("DELETE", f"/api/v1/cases/{cid}", json=payload)
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "VERSION_CONFLICT"
+    payload["expected_version"] = case["version"]
+    response = client.request("DELETE", f"/api/v1/cases/{cid}", json=payload)
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert response.json()["data"]["deleted_at"].endswith("Z")
+    assert client.get(f"/api/v1/cases/{cid}").status_code == 404
+    assert client.get("/api/v1/cases").json()["data"]["items"] == []
+    with app.state.session_factory() as db:
+        assert db.get(Case, UUID(cid)).deleted_at is not None
+        assert db.scalar(select(AuditEvent).where(AuditEvent.case_id == UUID(cid), AuditEvent.event_type == "CASE_DELETED")) is not None
+    client.post("/auth/logout")
+    assert client.request("DELETE", f"/api/v1/cases/{cid}", json=payload).status_code == 401

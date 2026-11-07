@@ -269,3 +269,13 @@ test("failed analysis with no provider response retains null model and original 
   }
   assert.equal(decodeJob(jobResource()).ai_execution.model, "synthetic-test-model");
 });
+
+
+test("document types save together at the footer and unsaved choices block Assess", () => {
+  const docs = [documentResource(), documentResource("TECHNICAL_SPECIFICATION")];
+  const base = { resources: { ...emptyResources(), caseResource: caseResource(), documents: docs }, ids: { ...emptyIds(), case_id: IDs.case } };
+  const html = view({ ...base, documentTypeDrafts: { [IDs.tor]: "OTHER" } });
+  assert.equal((html.match(/>Save document types<\/button>/g) ?? []).length, 1);
+  assert.match(html, /Save document types<\/button><button[^>]*disabled=""[^>]*>Continue to Assess/);
+  assert.match(view(base), /disabled=""[^>]*>Save document types/);
+});

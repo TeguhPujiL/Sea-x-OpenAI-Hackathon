@@ -135,3 +135,5 @@ export function decodeEnvelope<T>(value: unknown, dataDecoder: Decoder<T>): ApiE
 }
 
 export const decodeDocumentDeleted = decode<{ document_id: string; deleted_at: string }>("deleted_document", { document_id: uuid, deleted_at: utc });
+
+export const decodeCaseDeleted = decode<{ case_id: string; deleted_at: string }>("deleted_case", { case_id: uuid, deleted_at: utc });

@@ -4,6 +4,7 @@ import json
 from typing import Literal, Protocol
 from openai import OpenAI, APITimeoutError, RateLimitError, APIError
 from app.schemas.decisions import ChallengeOutput, RepairOutput
+from app.services.ai.structured_schema import structured_output_schema
 from app.services.ai.provider import ProviderResult, ProviderFailure
 
 CHALLENGE_PROMPT_VERSION = "procurement-challenge-v1"
@@ -68,7 +69,7 @@ class OpenAIDecisionProvider:
             response = client.responses.create(model=settings.openai_model, instructions=instructions,
                 input=json.dumps(context, ensure_ascii=False), store=False,
                 text={"format": {"type": "json_schema", "name": f"procuremind_{kind}_v1",
-                    "schema": output.model_json_schema(), "strict": True}})
+                    "schema": structured_output_schema(output), "strict": True}})
             usage = None if response.usage is None else {"input_tokens": response.usage.input_tokens,
                 "output_tokens": response.usage.output_tokens}
             return DecisionResult(response.output_text or "", response.model, usage, getattr(response, "status", None))

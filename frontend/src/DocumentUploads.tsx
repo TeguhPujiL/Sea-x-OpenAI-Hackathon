@@ -23,13 +23,9 @@ export function DocumentUploads({ disabled, items, onUpload, onRetry, onClear }:
     </section>}
   </>;
 }
-export function DocumentTypeEditor({ document, disabled, onSave }: {
-  document: DocumentResource; disabled: boolean; onSave: (id: string, type: DocumentType) => void;
+export function DocumentTypeEditor({ document, disabled, value, onChange }: {
+  document: DocumentResource; disabled: boolean; value?: DocumentType; onChange: (id: string, type: DocumentType) => void;
 }) {
-  return <form className="document-type-editor" onSubmit={e => {
-    e.preventDefault(); const value = new FormData(e.currentTarget).get("document_type") as DocumentType;
-    if (value !== document.document_type) onSave(document.document_id, value);
-  }}><label className="field"><span>Document type for {document.filename}</span>
-    <select key={`${document.document_id}-${document.version}`} name="document_type" defaultValue={document.document_type} disabled={disabled}>{documentTypes.map(type => <option value={type} key={type}>{human(type)}</option>)}</select></label>
-    <button className="secondary" disabled={disabled}>Save document type</button></form>;
+  return <div className="document-type-editor"><label className="field"><span>Document type for {document.filename}</span>
+    <select name="document_type" value={value ?? document.document_type} onChange={e => onChange(document.document_id, e.target.value as DocumentType)} disabled={disabled}>{documentTypes.map(type => <option value={type} key={type}>{human(type)}</option>)}</select></label></div>;
 }

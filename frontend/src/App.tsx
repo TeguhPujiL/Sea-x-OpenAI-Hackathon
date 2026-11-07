@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, RequestError, TransportError, type ClientConfig, type PreparedRequest } from "./api";
-import { decodeCase, decodeDocument, decodeDocumentDeleted, decodeJob, decodeChallenge, decodeSimulation, decodeRepair, decodeReview, decodeAudit, object, ShapeError, uuid, type CaseInput, type CaseResource, type DocumentType } from "./contracts";
+import { decodeCase, decodeCaseDeleted, decodeDocument, decodeDocumentDeleted, decodeJob, decodeChallenge, decodeSimulation, decodeRepair, decodeReview, decodeAudit, object, ShapeError, uuid, type CaseInput, type CaseResource, type DocumentType } from "./contracts";
 import { loadWorkspace, listAll, restoreCaseResources } from "./resources";
 import { emptyIds, emptyResources, readIds, saveIds, cleanCase, terminal, recoveredStep, pollJob, hasRequiredDocuments, canReview, storageKey, type Identifiers, type Resources } from "./workflow";
 import { WorkspaceView } from "./WorkspaceView";
 import { CaseHistory } from "./CaseHistory";
-import { readCaseHistory, rememberCase } from "./history";
+import { readCaseHistory, rememberCase, caseHistoryKey } from "./history";
+import { saveDocumentTypes } from "./documentTypes";
 import { newUploadItems, uploadBatch, type UploadItem } from "./uploads";
 
 export default function App({ config, userName, onLogout }: { config: ClientConfig; userName?: string; onLogout?: () => Promise<void> }) {
+  const [typeDrafts, setTypeDrafts] = useState<Record<string, DocumentType>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyCases, setHistoryCases] = useState<CaseResource[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -48,6 +50,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
   const commit = useCallback((next: Resources) => { resourceRef.current = next; setResources(next); }, []);
   useEffect(() => {
     const caseId = resources.caseResource?.case_id;
+    setTypeDrafts({});
     if (!caseId) return;
     try { const result = rememberCase(window.localStorage, caseId); setRecentIds(result.ids); setHistoryStorageWarning(!result.saved); }
     catch { setHistoryStorageWarning(true); }
@@ -157,7 +160,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
   }
   function openCase(caseId: string) {
     if (!uuid(caseId.trim())) { setError(new Error("Enter a valid UUID v4 case ID.")); return; }
-    if ((dirtyRef.current || uploadRef.current.some(item => item.status === "unknown")) && !window.confirm("Open another case? Unsaved text and unresolved upload retries will be left behind. Server records remain available.")) return;
+    if ((dirtyRef.current || Object.keys(typeDrafts).some(id => resourceRef.current.documents.some(d => d.document_id === id && d.document_type !== typeDrafts[id])) || uploadRef.current.some(item => item.status === "unknown")) && !window.confirm("Open another case? Unsaved text, document type selections and unresolved upload retries will be left behind. Server records remain available.")) return;
     const next = { ...emptyIds(), case_id: caseId.trim() };
     void execute("Opening case", () => client.prepare("GET", `/cases/${next.case_id}`, decodeCase), async value => {
       polling.current?.abort(); restoration.current?.abort(); setPollState(null); updateUploads([]);
@@ -191,13 +194,56 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     } catch (err) { if (!controller.signal.aborted) setError(err instanceof Error ? err : new Error(String(err))); }
     finally { busyRef.current = false; if (mounted.current) setBusy(null); }
   }
+  async function saveTypes() {
+    if (busyRef.current || restoring || conflict || transportRetry) return;
+    if (resourceRef.current.job && !terminal(resourceRef.current.job.status)) return;
+    if (dirtyRef.current && !window.confirm("Saving document types leaves the unsaved repair text. Continue?")) return;
+    busyRef.current = true; setBusy("Saving document types"); setError(null);
+    const controller = new AbortController(); mutation.current = controller;
+    try {
+      await saveDocumentTypes(client, resourceRef.current.documents, typeDrafts, value => {
+        const documents = resourceRef.current.documents.map(d => d.document_id === value.document_id ? value : d);
+        setTypeDrafts(previous => { const next = { ...previous }; delete next[value.document_id]; return next; });
+        polling.current?.abort(); setPollState(null);
+        changeIds({ ...emptyIds(), case_id: value.case_id, document_ids: documents.map(d => d.document_id) });
+        commit({ ...emptyResources(), caseResource: resourceRef.current.caseResource, documents }); adoptText("");
+      }, controller.signal);
+      await refreshCase(controller.signal);
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        setError(err instanceof Error ? err : new Error(String(err)));
+        if (err instanceof RequestError && err.body.code === "VERSION_CONFLICT") {
+          try { await refresh(true, controller.signal); } catch { /* Preserve the original conflict. */ }
+        }
+      }
+    } finally { busyRef.current = false; if (mounted.current) setBusy(null); }
+  }
+  async function deleteHistoryCase(value: CaseResource) {
+    if (busyRef.current || restoring || conflict || transportRetry) return;
+    if (!window.confirm(`Delete case "${value.title}" from the list? Its server history is retained. Active analyses or reviewed cases cannot be deleted.`)) return;
+    const reason = window.prompt("Reason for deleting this case:", "Case is no longer needed");
+    if (!reason?.trim()) return;
+    busyRef.current = true; setBusy("Deleting case"); setError(null);
+    try {
+      const result = await client.prepare("DELETE", `/cases/${value.case_id}`, decodeCaseDeleted, { body: { reason: reason.trim(), expected_version: value.version } }).send();
+      if (result.case_id !== value.case_id) throw new ShapeError("Deleted case identity does not match");
+      setHistoryCases(previous => previous.filter(c => c.case_id !== value.case_id));
+      setRecentIds(previous => { const next = previous.filter(id => id !== value.case_id); try { window.localStorage.setItem(caseHistoryKey, JSON.stringify(next)); } catch { setHistoryStorageWarning(true); } return next; });
+      if (idsRef.current.case_id === value.case_id) {
+        polling.current?.abort(); restoration.current?.abort(); updateUploads([]); setTypeDrafts({});
+        changeIds(emptyIds()); commit(emptyResources()); adoptText(""); setStep(0); setPollState(null);
+      }
+    } catch (err) { setError(err instanceof Error ? err : new Error(String(err))); if (err instanceof RequestError && err.body.code === "VERSION_CONFLICT") await loadHistory(); }
+    finally { busyRef.current = false; if (mounted.current) setBusy(null); }
+  }
+  const hasTypeChanges = resources.documents.some(d => typeDrafts[d.document_id] && typeDrafts[d.document_id] !== d.document_type);
   const finding = resources.findings.find(f => f.finding_id === ids.selected_finding_id);
   return <WorkspaceView userName={userName} onLogout={onLogout ? () => {
-    if ((dirtyRef.current || uploadRef.current.some(item => item.status === "unknown")) && !window.confirm("Sign out and leave unsaved work or unresolved upload retries?")) return;
+    if ((dirtyRef.current || Object.keys(typeDrafts).some(id => resourceRef.current.documents.some(d => d.document_id === id && d.document_type !== typeDrafts[id])) || uploadRef.current.some(item => item.status === "unknown")) && !window.confirm("Sign out and leave unsaved work or unresolved upload retries?")) return;
     void onLogout().then(() => { try { window.sessionStorage.removeItem(storageKey); } catch { /* No resource content is stored. */ } }).catch(err => setError(err));
   } : undefined}
     onHistory={() => historyOpen ? setHistoryOpen(false) : void loadHistory()}
-    historyPanel={historyOpen ? <CaseHistory cases={historyCases} recentIds={recentIds} activeId={ids.case_id} loading={historyLoading} error={historyError} disabled={!!busy || restoring || !!conflict || !!transportRetry} onOpen={openCase} onRefresh={() => void loadHistory()} onClose={() => setHistoryOpen(false)} /> : undefined}
+    historyPanel={historyOpen ? <CaseHistory cases={historyCases} recentIds={recentIds} activeId={ids.case_id} loading={historyLoading} error={historyError} disabled={!!busy || restoring || !!conflict || !!transportRetry} onOpen={openCase} onDelete={value => void deleteHistoryCase(value)} onRefresh={() => void loadHistory()} onClose={() => setHistoryOpen(false)} /> : undefined}
     historyStorageWarning={historyStorageWarning} uploadItems={uploadItems}
     onRetryUploads={() => void runUploads(uploadRef.current)}
     onClearUploads={() => { if (uploadRef.current.some(item => item.status === "unknown") && !window.confirm("Clear upload status and abandon pending transport retries? Uploaded server records will be kept.")) return; updateUploads([]); }}
@@ -212,26 +258,14 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
         if (value.document_id !== documentId) throw new ShapeError("Deleted document identity does not match.");
         polling.current?.abort(); setPollState(null);
         const documents = resourceRef.current.documents.filter(d => d.document_id !== documentId);
+        setTypeDrafts(previous => { const next = { ...previous }; delete next[documentId]; return next; });
         updateUploads(uploadRef.current.filter(item => item.document?.document_id !== documentId));
         changeIds({ ...emptyIds(), case_id: idsRef.current.case_id, document_ids: documents.map(d => d.document_id) });
         commit({ ...emptyResources(), caseResource: resourceRef.current.caseResource, documents }); adoptText(""); await refreshCase(signal);
       }, document.version);
     }}
-    onDocumentType={(documentId, type) => {
-      const document = resourceRef.current.documents.find(d => d.document_id === documentId);
-      void execute("Updating document type", () => {
-        if (!document || !idsRef.current.case_id) throw new Error("Open the document's case first.");
-        if (resourceRef.current.job && !terminal(resourceRef.current.job.status)) throw new Error("Wait for the active analysis before changing document types.");
-        if (dirtyRef.current && !window.confirm("Changing document type leaves the unsaved repair draft. Continue?")) throw new Error("Document type change cancelled.");
-        return client.prepare("PATCH", `/documents/${documentId}`, decodeDocument, { body: { document_type: type, expected_version: document.version } });
-      }, async (value, signal) => {
-        if (value.case_id !== idsRef.current.case_id || value.document_id !== documentId) throw new ShapeError("Document update refers to another case or document.");
-        polling.current?.abort(); setPollState(null);
-        const documents = resourceRef.current.documents.map(d => d.document_id === documentId ? value : d);
-        changeIds({ ...emptyIds(), case_id: value.case_id, document_ids: documents.map(d => d.document_id) });
-        commit({ ...emptyResources(), caseResource: resourceRef.current.caseResource, documents }); adoptText(""); await refreshCase(signal);
-      }, document?.version);
-    }} resources={resources} ids={ids} step={step} busy={busy} restoring={restoring} pollState={pollState} error={error} conflict={conflict} storageWarning={storageWarning} demoMode={demoMode} healthMessage={healthMessage} meta={client.lastMeta} transportRetry={transportRetry}
+    documentTypeDrafts={typeDrafts} onDocumentType={(documentId, type) => setTypeDrafts(previous => ({ ...previous, [documentId]: type }))}
+    onSaveDocumentTypes={() => void saveTypes()} resources={resources} ids={ids} step={step} busy={busy} restoring={restoring} pollState={pollState} error={error} conflict={conflict} storageWarning={storageWarning} demoMode={demoMode} healthMessage={healthMessage} meta={client.lastMeta} transportRetry={transportRetry}
     proposedText={proposedText} dirtyDraft={dirtyDraft} setProposedText={value => adoptText(value, value !== resources.repair?.proposed_text)}
     onStep={next => { setStep(next); if (next === 5) void readAssurance(); }} onRefresh={() => void refreshWorkspace()} onDismissError={() => setError(null)}
     onReset={() => {
@@ -250,9 +284,11 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     }}
     onUpload={(files, description) => void runUploads(newUploadItems(files, description))}
     onAnalyze={() => {
+      if (hasTypeChanges) { setError(new Error("Save document types before analysis.")); return; }
       if (dirtyDraft && !window.confirm("Start a new analysis and leave the unsaved repair text? Existing server records remain immutable.")) return;
       const caseId = ids.case_id; const documentIds = resources.documents.map(d => d.document_id);
       void execute("Starting analysis", () => {
+        if (resourceRef.current.documents.some(d => typeDrafts[d.document_id] && typeDrafts[d.document_id] !== d.document_type)) throw new Error("Save document types before analysis.");
         if (!caseId || !hasRequiredDocuments(resourceRef.current.documents)) throw new Error("A TOR and technical specification are required for the P0 comparison.");
         return client.prepare("POST", `/cases/${caseId}/analyses`, decodeJob, { status: 202, body: { document_ids: documentIds, analysis_types: ["REQUIREMENT_EXTRACTION", "CONTRADICTION_DETECTION"], force_reanalysis: false } });
       }, value => {

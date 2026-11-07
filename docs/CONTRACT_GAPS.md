@@ -79,13 +79,13 @@ Not fully specified: upload byte/page limits, list defaults/maxima, idempotency 
 
 PROPOSED: document concrete operational policies with Teguh/owners, escalating any changed wire semantics to a versioned revision.
 
-## G10 - Foundation implementation
+## G10 - Teguh P0 implementation
 
-Status: **FOUNDATION IMPLEMENTED / FEATURE INTEGRATION PENDING**.
+Status: **OWNED P0 IMPLEMENTED / INTEGRATION PENDING**.
 
-The shared FastAPI/SQLite/schema/model infrastructure and React/Vite/TypeScript/Tailwind shell are implemented and verified. The 36 business routes remain empty router ownership boundaries. No PDF/AI service, simulator, review/audit service, business transaction, seed or product flow is pre-implemented. Production OIDC, case authorization, transactional idempotency, optimistic-concurrency commands, durable jobs and migrations remain owner integration work.
+Case/document/analysis/job/finding routes and their storage, AI, ACL, idempotency and atomic audit paths are implemented. Challenge/repair and teammate services remain outside this task. The branch's generated schema is openapi.teguh-p0.json; the original foundation snapshot is historical. Live OpenAI inference, production OIDC, integrated frontend, simulation and assurance workflows still require owner validation.
 
-The empty demo database initializer is explicit and never runs on application startup. It is not a migration runner. JSON contents and cross-resource case consistency require service validation. Shared SQLite guards forbid updates/deletes for AI executions, simulations, reviews and audit events; they do not implement their business workflows.
+Migration 0001 is explicit, row-preserving, checks foreign keys and installs source/job integrity guards. It is an MVP SQLite migration runner, not a full production migration framework. Legacy actor/input provenance is not fabricated. See TEGUH_P0_HANDOFF.md.
 
 ## G11 - PROPOSED foundation operational defaults
 
@@ -96,3 +96,15 @@ A missing/blank Idempotency-Key is mapped by the shared dependency to 400 VALIDA
 ## Editorial notes
 
 Page 26 labels repair creation under a duplicated 6.4 Findings heading; the route text, page 5 resource matrix and pages 27-29 establish the repair-proposal path. Query examples contain &offset; / &limit; publication artifacts. These are recorded as editorial issues, not changed route or parameter semantics. Section 7.2's compact job examples are nested job fragments; Section 2.3 still controls the outer envelope.
+
+## G12 - PROPOSED P0 operational policies
+
+Status: **OPEN / PROPOSED IMPLEMENTATION DECISIONS**.
+
+Current defaults: 10 MiB PDF; 100 pages; 500000 extracted characters; 100000 characters per AI input; 60-second provider timeout; list default20/max100; backend-managed case membership; ADMIN-only include_deleted reads. PDF validation/extraction is synchronous and returns processing_status=COMPLETED; input bytes are never overwritten. No result cache is inferred from force_reanalysis=false: a distinct valid create request produces a new preserved execution. Multipart hashing ignores transport boundaries and covers file digest/name/type/description. Idempotent replay preserves the original envelope metadata.
+
+Nonterminal startup recovery is for single-worker deployments only. Interrupted known-actor jobs become FAILED / INTERNAL_ERROR and can be explicitly retried. No fictitious AI execution is created. Production queues and process-isolated PDF parsing remain deployment work.
+
+Runtime model is null when no provider response exists; requested_model is retained internally and never returned as measured runtime provenance. Internal structured-output schema procurement-analysis-v1 adds no public request fields. Event vocabulary for owned material writes is recorded by the core integration writer without adding a closed audit enum or changing Fazhima's service/router.
+
+Finding RESOLVED is conservatively rejected until its disposition-evidence input is clarified; rationale-bearing dismissals are implemented. These policies are explicit, not silently elevated to contract clauses. Wire shape/status or enum corrections still require approved versioned revisions.

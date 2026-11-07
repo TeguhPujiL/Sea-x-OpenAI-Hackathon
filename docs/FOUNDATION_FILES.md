@@ -1,6 +1,45 @@
 # Teguh branch file inventory
 
-Files copied/adapted from main 45b0c9e for this branch. Frontend and Simulation/Review/Audit routers are excluded. Local ignored runtimes, caches and dependencies are not part of the branch.
+Current branch source inventory. Ignored runtimes, caches, PDFs, database files and dependencies are excluded. Current P0 changes are listed separately; original shared foundation files remain in place.
+
+## Current P0 changes
+
+- `.env.example`
+- `AGENTS.md`
+- `README.md`
+- `backend/app/api/presenters.py`
+- `backend/app/api/routes/analyses.py`
+- `backend/app/api/routes/cases.py`
+- `backend/app/api/routes/documents.py`
+- `backend/app/api/routes/findings.py`
+- `backend/app/api/routes/jobs.py`
+- `backend/app/core/access.py`
+- `backend/app/core/config.py`
+- `backend/app/core/init_db.py`
+- `backend/app/core/migrations.py`
+- `backend/app/core/transactions.py`
+- `backend/app/core/upload_limit.py`
+- `backend/app/main.py`
+- `backend/app/models/__init__.py`
+- `backend/app/models/access.py`
+- `backend/app/models/integrity.py`
+- `backend/app/models/tables.py`
+- `backend/app/schemas/p0.py`
+- `backend/app/services/__init__.py`
+- `backend/app/services/ai/__init__.py`
+- `backend/app/services/ai/jobs.py`
+- `backend/app/services/ai/provider.py`
+- `backend/app/services/documents/__init__.py`
+- `backend/app/services/documents/pdf.py`
+- `backend/tests/test_foundation.py`
+- `backend/tests/test_p0.py`
+- `docs/CONTRACT_GAPS.md`
+- `docs/CONTRACT_LOCK.md`
+- `docs/TEGUH_P0_HANDOFF.md`
+- `docs/VERIFICATION.md`
+- `docs/openapi.teguh-p0.json`
+
+## All branch files
 
 - `.env.example`
 - `.gitignore`
@@ -8,6 +47,7 @@ Files copied/adapted from main 45b0c9e for this branch. Frontend and Simulation/
 - `README.md`
 - `backend/app/__init__.py`
 - `backend/app/api/__init__.py`
+- `backend/app/api/presenters.py`
 - `backend/app/api/response.py`
 - `backend/app/api/routes/__init__.py`
 - `backend/app/api/routes/analyses.py`
@@ -18,19 +58,33 @@ Files copied/adapted from main 45b0c9e for this branch. Frontend and Simulation/
 - `backend/app/api/routes/jobs.py`
 - `backend/app/api/routes/repairs.py`
 - `backend/app/core/__init__.py`
+- `backend/app/core/access.py`
 - `backend/app/core/config.py`
 - `backend/app/core/database.py`
 - `backend/app/core/init_db.py`
+- `backend/app/core/migrations.py`
 - `backend/app/core/security.py`
+- `backend/app/core/transactions.py`
+- `backend/app/core/upload_limit.py`
 - `backend/app/main.py`
 - `backend/app/models/__init__.py`
+- `backend/app/models/access.py`
 - `backend/app/models/base.py`
+- `backend/app/models/integrity.py`
 - `backend/app/models/tables.py`
 - `backend/app/schemas/__init__.py`
+- `backend/app/schemas/p0.py`
 - `backend/app/schemas/shared.py`
+- `backend/app/services/__init__.py`
+- `backend/app/services/ai/__init__.py`
+- `backend/app/services/ai/jobs.py`
+- `backend/app/services/ai/provider.py`
+- `backend/app/services/documents/__init__.py`
+- `backend/app/services/documents/pdf.py`
 - `backend/pyproject.toml`
 - `backend/requirements.lock.txt`
 - `backend/tests/test_foundation.py`
+- `backend/tests/test_p0.py`
 - `docs/CONTRACT_GAPS.md`
 - `docs/CONTRACT_LOCK.md`
 - `docs/FOUNDATION_FILES.md`
@@ -39,3 +93,4 @@ Files copied/adapted from main 45b0c9e for this branch. Frontend and Simulation/
 - `docs/VERIFICATION.md`
 - `docs/contract_snapshot.json`
 - `docs/openapi.foundation.json`
+- `docs/openapi.teguh-p0.json`

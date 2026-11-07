@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.openapi.utils import get_openapi
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 
@@ -9,6 +10,9 @@ from app.api.response import ApiError, failure, success
 from app.api.routes import router
 from app.core.config import Settings, get_settings
 from app.core.database import build_engine, session_factory
+from app.core.upload_limit import UploadLimitMiddleware
+from app.services.ai.provider import OpenAIAnalysisProvider
+from app.services.ai.jobs import recover_interrupted_jobs
 from app.schemas.shared import Envelope, ErrorDetail, HealthData
 
 
@@ -19,13 +23,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         engine = build_engine(config.database_url)
         app.state.session_factory = session_factory(engine)
+        recover_interrupted_jobs(app)
         try:
             yield
         finally:
             engine.dispose()
 
     app = FastAPI(title="ProcureMind V4.1", version="1.1", lifespan=lifespan,
-        description="Shared foundation only. Feature router modules are empty. See contract gap register.")
+        description="Teguh P0 case/document/analysis/finding backend. Challenge/repair and teammate modules remain separate.")
+    app.state.settings = config
+    app.state.analysis_provider = OpenAIAnalysisProvider(config)
+    app.add_middleware(UploadLimitMiddleware, max_bytes=config.upload_max_bytes)
     app.dependency_overrides[get_settings] = lambda: config
     app.include_router(router, prefix="/api/v1")
 
@@ -65,6 +73,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # PROPOSED health payload; envelope itself is specified by Section 2.
         return success(HealthData(status="ok", demo_mode=config.demo_mode), request.state.request_id)
 
+    def custom_openapi():
+        if app.openapi_schema is None:
+            from app.schemas.shared import Envelope
+            schema = get_openapi(title=app.title, version=app.version, description=app.description, routes=app.routes)
+            for path, methods in schema["paths"].items():
+                for method, operation in methods.items():
+                    if "422" in operation.get("responses", {}):
+                        operation["responses"].pop("422")
+                    for status, description in ((400, "Validation error"), (401, "Authentication required"), (403, "Forbidden"), (404, "Resource not found"), (409, "Version/state/idempotency conflict"), (500, "Internal error")):
+                        operation["responses"].setdefault(str(status), {"description": description,
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EnvelopeError"}}}})
+                    if method == "post" and path.endswith("/documents"):
+                        for status in (413, 415, 422):
+                            operation["responses"][str(status)] = {"description": "PDF upload rejection", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EnvelopeError"}}}}
+            error_schema = Envelope[None].model_json_schema(ref_template="#/components/schemas/{model}")
+            definitions = error_schema.pop("$defs", {})
+            schema.setdefault("components", {}).setdefault("schemas", {}).update(definitions)
+            schema["components"]["schemas"]["EnvelopeError"] = error_schema
+            app.openapi_schema = schema
+        return app.openapi_schema
+    app.openapi = custom_openapi
     return app
 
 

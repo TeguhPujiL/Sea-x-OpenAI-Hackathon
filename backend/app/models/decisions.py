@@ -1,5 +1,5 @@
 """Decision-generation idempotency leases and immutable submitted content."""
-from sqlalchemy import Column, ForeignKey, JSON, String, Integer, CheckConstraint, DDL, event
+from sqlalchemy import Column, ForeignKey, JSON, String, Integer, CheckConstraint, event
 from sqlalchemy.orm import Session
 from app.models.base import Base, Created, UuidV4, UtcDateTime
 

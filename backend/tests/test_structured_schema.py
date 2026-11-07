@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 from app.schemas.p0 import AnalysisOutput, Citation
 from app.schemas.decisions import ChallengeOutput, RepairOutput
-from app.services.ai.structured_schema import structured_output_schema, UUID4_PATTERN
+from app.services.ai.schema import structured_output_schema, UUID4_PATTERN
 
 
 @pytest.mark.parametrize('model', [AnalysisOutput, ChallengeOutput, RepairOutput])

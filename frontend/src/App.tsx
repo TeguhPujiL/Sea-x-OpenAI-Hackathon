@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createClient, RequestError, TransportError, type ClientConfig, type PreparedRequest } from "./api";
 import { decodeCase, decodeCaseDeleted, decodeDocument, decodeDocumentDeleted, decodeJob, decodeChallenge, decodeSimulation, decodeRepair, decodeReview, decodeAudit, object, ShapeError, uuid, type CaseInput, type CaseResource, type DocumentType } from "./contracts";
 import { loadWorkspace, listAll, restoreCaseResources } from "./resources";
-import { emptyIds, emptyResources, readIds, saveIds, cleanCase, terminal, recoveredStep, pollJob, hasRequiredDocuments, canReview, storageKey, type Identifiers, type Resources } from "./workflow";
+import { reviewReasonError, emptyIds, emptyResources, readIds, saveIds, cleanCase, terminal, recoveredStep, pollJob, hasRequiredDocuments, canReview, storageKey, type Identifiers, type Resources } from "./workflow";
 import { WorkspaceView } from "./WorkspaceView";
 import { CaseHistory } from "./CaseHistory";
 import { readCaseHistory, rememberCase, caseHistoryKey } from "./history";
@@ -357,7 +357,9 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
       });
     }}
     onReview={(decision, reason) => void execute("Recording internal review", () => {
-      if (!canReview(resourceRef.current) || !reason.trim() || reason.trim().length < 10) throw new Error("A submitted draft and meaningful decision reason are required.");
+      if (!canReview(resourceRef.current)) throw new Error("A submitted draft and refreshed case are required.");
+      const reasonError = reviewReasonError(reason);
+      if (reasonError) throw new Error(reasonError);
       return client.prepare("POST", `/cases/${ids.case_id}/reviews`, decodeReview, { status: 201, body: { repair_proposal_id: resources.repair!.repair_proposal_id, decision, decision_reason: reason.trim(), expected_case_version: resources.caseResource!.version } });
     }, async (value, signal) => {
       if (value.case_id !== ids.case_id || value.repair_proposal_id !== resources.repair?.repair_proposal_id) throw new ShapeError("Review references another case or repair proposal.");

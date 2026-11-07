@@ -4,7 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createClient, RequestError, TransportError, readConfig, normalize, requiresIdempotency } from "../src/api.ts";
 import { decodeCase, decodeDocument, decodeJob, decodeFinding, decodeChallenge, decodeSimulation, decodeRepair, decodeReview, decodeAudit, decodeEnvelope, ShapeError, uuid } from "../src/contracts.ts";
-import { emptyIds, emptyResources, saveIds, readIds, storageKey, hasRequiredDocuments, pollJob, cleanCase, canReview, recoveredStep } from "../src/workflow.ts";
+import { reviewReasonError, emptyIds, emptyResources, saveIds, readIds, storageKey, hasRequiredDocuments, pollJob, cleanCase, canReview, recoveredStep } from "../src/workflow.ts";
 import { loadWorkspace, listAll } from "../src/resources.ts";
 import { WorkspaceView, ErrorPanel } from "../src/WorkspaceView.tsx";
 import { IDs, envelope, errorEnvelope, meta, caseResource, documentResource, jobResource, findingResource, challengeResource, simulationResource, repairResource, reviewResource, auditResource, fixtureBackend, page } from "./fixtures.mjs";
@@ -327,4 +327,19 @@ test("Assure includes the recorded summary above the human review and preserves 
   assert.match(html, /Vendor proposal recommendations/);
   assert.match(html, /Clean-case completion pending contract decision/);
   assert.doesNotMatch(view({ resources, step: 0 }), /id="assurance-summary-title"/);
+});
+
+
+test("review form enforces the existing meaningful-reason policy before submission", () => {
+  for (const value of ["", "          ", "Approved", "Approved now", "a b ...........", "one two " + "x".repeat(4000)]) {
+    assert.equal(typeof reviewReasonError(value), "string", value);
+  }
+  for (const value of ["Evidence supports this decision.", "Bukti mendukung keputusan ini.", "  Evidence   supports\nthis decision.  "]) {
+    assert.equal(reviewReasonError(value), null);
+  }
+  assert.equal(reviewReasonError("one two " + "x".repeat(3992)), null);
+  const resources = fullResources(); resources.repair.status = "SUBMITTED";
+  const html = view({ resources, ids: fullIds(), step: 5 });
+  assert.match(html, /at least 3 words/);
+  assert.match(html, /name="decision_reason"[^>]*maxLength="4000"/);
 });

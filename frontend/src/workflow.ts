@@ -85,3 +85,15 @@ export async function pollJob(get: (signal: AbortSignal) => Promise<JobResource>
   }
   throw signal.reason;
 }
+
+
+// Match the existing Assurance review policy before sending an immutable decision.
+export function reviewReasonError(reason: string): string | null {
+  const value = reason.trim();
+  const length = Array.from(value).length;
+  const alphanumeric = value.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
+  if (length < 10 || length > 4000 || value.split(/\s+/u).length < 3 || alphanumeric < 6) {
+    return "Explain the decision in 3 or more words, 10-4000 characters, including at least 6 letters or numbers.";
+  }
+  return null;
+}

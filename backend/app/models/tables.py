@@ -7,7 +7,7 @@ from sqlalchemy import CheckConstraint, Column, DDL, Enum as SqlEnum, ForeignKey
 from sqlalchemy.orm import Session
 
 from app.models.base import Base, Created, Identity, Mutable, SoftDeleted, UtcDateTime, UuidV4
-from app.schemas.shared import (AnalysisType, AssuranceStatus, CaseStatus, ChallengeStatus,
+from app.schemas.shared import (AssuranceStatus, CaseStatus, ChallengeStatus,
     DocumentType, EvidenceStatus, FindingSeverity, FindingStatus, ProcessingStatus,
     RepairActionType, RepairStatus, ReviewDecision)
 

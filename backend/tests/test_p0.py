@@ -461,16 +461,3 @@ def test_raw_sql_cannot_rewrite_pdf_identity_or_finding_provenance(runtime):
         for statement in ("UPDATE documents SET sha256='changed'", "UPDATE findings SET severity='LOW'", "UPDATE document_pages SET normalized_text='changed'", "DELETE FROM evidence_refs"):
             with pytest.raises(IntegrityError): db.execute(text(statement))
             db.rollback()
-
-
-def test_provider_uuid_translation_preserves_local_uuid4_validation():
-    from pydantic import ValidationError
-    from app.schemas.p0 import Citation, AnalysisOutput
-    from app.services.ai.schema import structured_output_schema
-    original = AnalysisOutput.model_json_schema()
-    converted = structured_output_schema(AnalysisOutput)
-    assert converted["$defs"]["Citation"]["properties"]["document_id"]["format"] == "uuid"
-    assert AnalysisOutput.model_json_schema() == original
-    assert original["$defs"]["Citation"]["properties"]["document_id"]["format"] == "uuid4"
-    with pytest.raises(ValidationError):
-        Citation(document_id="11111111-1111-1111-8111-111111111111", page_number=1, excerpt="Synthetic citation")

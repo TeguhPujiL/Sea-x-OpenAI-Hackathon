@@ -112,7 +112,7 @@ class AnalysisOutput(StrictModel):
 # Public response declarations preserve Section 6's exact wire names.
 from typing import Generic, TypeVar
 from app.schemas.shared import (UtcTimestamp, ProcessingStatus, CaseStatus, AssuranceStatus,
-    EvidenceStatus, Pagination, ErrorBody)
+    EvidenceStatus, Pagination)
 
 
 class CaseView(StrictModel):

@@ -1,5 +1,5 @@
 """Teguh resource integrity guards, installed by the explicit migration runner."""
-from sqlalchemy import DDL, event, inspect
+from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session
 from app.models.tables import AnalysisJob, DocumentPage, Document, Finding, EvidenceRef
 

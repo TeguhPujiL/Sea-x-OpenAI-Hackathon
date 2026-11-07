@@ -1,5 +1,4 @@
 """Compose existing owner migrations for a dedicated demo database only."""
-from pathlib import Path
 from sqlalchemy import inspect
 from app.core.config import get_settings
 from app.core.database import build_engine

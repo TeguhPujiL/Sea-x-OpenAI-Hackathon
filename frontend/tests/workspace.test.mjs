@@ -388,3 +388,12 @@ test("06 Assure refresh loads unchained audit history and renders its missing pr
   assert.match(html, new RegExp(`Actor ID: <code>${IDs.actor}</code>`));
   assert.doesNotMatch(html, /test-only-event-hash|does not match API Contract/);
 });
+
+test("Assure includes the recorded summary above the human review and preserves the clean-case gap", () => {
+  const resources = { ...emptyResources(), caseResource: caseResource(), job: jobResource("COMPLETED", true) };
+  const html = view({ resources, step: 5 });
+  assert.match(html, /Assurance summary/);
+  assert.match(html, /Vendor proposal recommendations/);
+  assert.match(html, /Clean-case completion pending contract decision/);
+  assert.doesNotMatch(view({ resources, step: 0 }), /id="assurance-summary-title"/);
+});

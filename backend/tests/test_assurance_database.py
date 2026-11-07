@@ -142,6 +142,8 @@ def test_migration_checksum_mismatch_and_bad_sql_roll_back(tmp_path, monkeypatch
             assert inspect(conn).get_table_names() == []
         revision.write_text("CREATE TABLE test_revision (value TEXT);\n")
         assert migrations.migrate(engine) == ["0001_test"]
+        revision.write_bytes(b"CREATE TABLE test_revision (value TEXT);\r\n")
+        assert migrations.migrate(engine) == []
         revision.write_text("CREATE TABLE test_revision (value INTEGER);\n")
         with pytest.raises(RuntimeError, match="checksum"):
             migrations.migrate(engine)

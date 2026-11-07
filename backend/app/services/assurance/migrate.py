@@ -46,13 +46,15 @@ def migrate(engine) -> list[str]:
             if set(known) - {f.stem for f in files}:
                 raise RuntimeError("Database contains unknown migration revisions")
             for file in files:
-                source = file.read_bytes()
-                digest = hashlib.sha256(source).hexdigest()
+                # Text-mode reading normalizes CRLF/LF. Git checkout settings
+                # must not make an unchanged revision fail on another host.
+                source = file.read_text(encoding="utf-8")
+                digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
                 if file.stem in known:
                     if known[file.stem] != digest:
                         raise RuntimeError(f"Migration checksum mismatch: {file.stem}")
                     continue
-                for sql in statements(source.decode("utf-8")):
+                for sql in statements(source):
                     conn.exec_driver_sql(sql)
                 conn.exec_driver_sql("INSERT INTO assurance_schema_revisions VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
                                      (file.stem, digest))

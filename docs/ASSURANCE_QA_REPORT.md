@@ -123,7 +123,7 @@ Commands were run with Windows PowerShell, Python 3.12.10 and the backend depend
 - scripts/assurance_fallback.ps1: all tests passed; backend/scripts compileall passed; strict readiness returned **exit 1 as expected** because full integration is incomplete. Its visible G01 warning and fixture-only label were verified.
 - python -m app.services.assurance.migrate --database-url sqlite:///.tools/qa-schema.db: both revisions applied explicitly; repeated/checksum/rollback behavior covered by tests.
 - PRAGMA foreign_key_check / integrity_check: no violations / ok.
-- git diff --check: passed.
+- git diff --check: passed after cleaning generated SQL whitespace. Migration checksum regression also verifies that CRLF/LF checkout differences do not change revision identity.
 
 Ignored local evidence: .tools/qa-results/assurance.xml (JUnit), fallback.log, readiness.json. The fallback uses disposable synthetic databases, makes no provider calls, does not overwrite user databases and exits with a blocked full-contract status. It supports assurance rehearsal and failure recovery; it is not a substitute for a live P0 workflow.
 

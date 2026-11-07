@@ -245,6 +245,15 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     finally { busyRef.current = false; if (mounted.current) setBusy(null); }
   }
   const hasTypeChanges = resources.documents.some(d => typeDrafts[d.document_id] && typeDrafts[d.document_id] !== d.document_type);
+  function selectFinding(id: string, openChallenge = false) {
+    if (!resources.findings.some(f => f.finding_id === id)) return;
+    if (id !== ids.selected_finding_id) {
+      if (dirtyDraft && !window.confirm("Change findings and discard unsaved draft text? Existing server records remain available.")) return;
+      changeIds({ ...ids, selected_finding_id: id, challenge_id: null, simulation_id: null, repair_proposal_id: null });
+      commit({ ...resources, challenge: null, simulation: null, repair: null, reviews: [], audit: [] }); adoptText("");
+    }
+    if (openChallenge) setStep(2);
+  }
   const finding = resources.findings.find(f => f.finding_id === ids.selected_finding_id);
   return <WorkspaceView userName={userName} onLogout={onLogout ? () => {
     if ((dirtyRef.current || Object.keys(typeDrafts).some(id => resourceRef.current.documents.some(d => d.document_id === id && d.document_type !== typeDrafts[id])) || uploadRef.current.some(item => item.status === "unknown")) && !window.confirm("Sign out and leave unsaved work or unresolved upload retries?")) return;
@@ -318,12 +327,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
       });
     }}
     onResumePolling={() => { if (ids.analysis_job_id) { setError(null); beginPolling(ids.analysis_job_id); } }}
-    onSelectFinding={id => {
-      if (id === ids.selected_finding_id || !resources.findings.some(f => f.finding_id === id)) return;
-      if (dirtyDraft && !window.confirm("Change findings and discard unsaved draft text? Existing server records remain available.")) return;
-      changeIds({ ...ids, selected_finding_id: id, challenge_id: null, simulation_id: null, repair_proposal_id: null });
-      commit({ ...resources, challenge: null, simulation: null, repair: null, reviews: [], audit: [] }); adoptText("");
-    }}
+    onSelectFinding={id => selectFinding(id)} onChallengeFinding={id => selectFinding(id, true)}
     onChallenge={requested => void execute("Generating challenge", () => {
       if (!finding || cleanCase(resources.job) || !requested.length) throw new Error("Select a real finding and at least one evidence request.");
       return client.prepare("POST", `/cases/${ids.case_id}/challenges`, decodeChallenge, { status: 201, body: { finding_id: finding.finding_id, generation_mode: "AI_ASSISTED", requested_evidence: requested } });

@@ -270,6 +270,22 @@ progress::-moz-progress-bar { background: #237c70; }
 }
 
 .delete-document { color: #a03f2b; display: block; margin: 8px 0; }
+.vendor-assessment { margin: 28px 0; }
+.vendor-assessment > p, .vendor-assessment p, .vendor-document-checks { font-size: 12px; }
+.vendor-assessment-card { border: 1px solid var(--line); border-radius: 10px; margin: 18px 0; padding: 20px; }
+.vendor-assessment-card > h4 { font-size: 18px; margin: 0 0 16px; }
+.vendor-package { padding: 16px; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.vendor-candidate { border-color: #79ad9c; background: #f4faf7; }
+.vendor-package h5, .vendor-concern h5 { font-size: 13px; margin: 12px 0 8px; }
+.vendor-document-checks { display: flex; flex-wrap: wrap; gap: 8px 24px; list-style: none; padding: 0; color: var(--muted); }
+.vendor-document-list { padding-left: 18px; }
+.vendor-document-list li { padding: 10px 0; overflow-wrap: anywhere; }
+.vendor-document-list strong { font-size: 12px; }
+.vendor-concern { border-top: 1px solid var(--line); padding: 12px 0; }
+.vendor-shared-concerns { margin-top: 24px; padding: 18px; background: #fffbf2; border: 1px solid #ebd7ab; border-radius: 8px; }
+.vendor-shared-concerns > h4 { margin: 0 0 12px; font-size: 15px; }
+.all-findings { margin: 24px 0 12px; }
+@media (max-width: 540px) { .vendor-assessment-card { padding: 14px; } .vendor-package { padding: 12px; } }
 
 
 .assurance-summary { border: 1px solid #cddfdb; border-radius: 10px; background: #f7faf9; padding: 24px; margin: 0 0 28px; }

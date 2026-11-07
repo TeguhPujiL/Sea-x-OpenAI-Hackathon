@@ -90,7 +90,7 @@ export function RepairEvidence({ resources, disabled, onUpload, onReanalyze, doc
     </details>
     <p role="status">{readiness.documentIds.length} documents selected for re-analysis.</p>
     <label className="checkbox"><input type="checkbox" checked={allowExisting} onChange={event => setAllowExisting(event.target.checked)} disabled={locked} />All needed evidence is already in the selected set; no additional upload is required.</label>
-    <p className="muted">Selected evidence must include a usable TOR and technical specification. New uploads start as Other until their types are saved. The new analysis may still return concerns or evidence warnings.</p>
+    <p className="muted">Selected evidence must include a usable TOR and technical specification. Recognizable filenames get a suggested document type; other names use Other. Review and save any type changes before re-analysis. The new analysis may still return concerns or evidence warnings.</p>
     {!!readiness.errors.length && <ul className="inline-warning" aria-label="Re-analysis requirements">{readiness.errors.map(error => <li key={error}>{error}</li>)}</ul>}
     <button className="primary" disabled={locked || !readiness.ready || selection.key !== evidence.key} onClick={() => onReanalyze(readiness.documentIds)}>Analyze selected revised evidence</button>
   </section>;

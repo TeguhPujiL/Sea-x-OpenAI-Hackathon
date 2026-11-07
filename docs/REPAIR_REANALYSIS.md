@@ -6,7 +6,7 @@ Each vendor has its own revised-PDF upload form, current documentation finding c
 
 An optional shared-case upload section covers TOR/specification or other cross-vendor revisions. Upload descriptions include the selected vendor label or shared-case context. Files are not silently renamed and descriptions are not treated as authoritative vendor ownership. Users should preserve recognizable vendor filename labels for quotations and warranty files so later Assess grouping remains consistent.
 
-The reviewer supplies a meaningful revision description, uploads one or more PDFs and assigns their document types. New uploads start as Other. A revised TOR or technical specification must have its type saved before replacing that document in the selected evidence set.
+The reviewer supplies a meaningful revision description and uploads one or more PDFs. Recognizable filenames automatically select an existing document type; unrecognized or ambiguous names use Other. The reviewer can correct the type after upload. A revised TOR or technical specification must have the appropriate saved type before replacing that document in the selected evidence set.
 
 The selection starts from the current analysis execution's authoritative input document IDs. Newly observed usable uploads are selected automatically, while explicit deselections stay deselected. A user must choose which old versions to exclude: a similar filename or description is not authority to supersede a document. A new analysis resets the panel to that new execution's actual input set.
 

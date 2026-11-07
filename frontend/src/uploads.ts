@@ -1,12 +1,14 @@
 import { RequestError, TransportError, type ApiClient, type PreparedRequest } from "./api";
-import { decodeDocument, ShapeError, type DocumentResource } from "./contracts";
+import { decodeDocument, ShapeError, type DocumentResource, type DocumentType } from "./contracts";
+import { detectDocumentType } from "./documentTypeDetection";
 export type UploadStatus = "pending" | "uploading" | "uploaded" | "failed" | "unknown" | "unverified";
 export interface UploadItem {
   id: string; file: File; description: string; status: UploadStatus; error?: string;
+  documentType?: DocumentType;
   request?: PreparedRequest<DocumentResource>; document?: DocumentResource;
 }
 export function newUploadItems(files: File[], description: string): UploadItem[] {
-  return files.map(file => ({ id: crypto.randomUUID(), file, description, status: "pending" }));
+  return files.map(file => ({ id: crypto.randomUUID(), file, description, status: "pending", documentType: detectDocumentType(file.name) }));
 }
 export async function uploadBatch(client: ApiClient, caseId: string, items: UploadItem[],
   changed: (items: UploadItem[]) => void, uploaded: (doc: DocumentResource) => void,
@@ -27,7 +29,7 @@ export async function uploadBatch(client: ApiClient, caseId: string, items: Uplo
       }
       let request = item.request;
       if (!request) {
-        const form = new FormData(); form.append("file", item.file); form.append("document_type", "OTHER");
+        const form = new FormData(); form.append("file", item.file); form.append("document_type", item.documentType ?? detectDocumentType(item.file.name));
         if (item.description.trim()) form.append("description", item.description.trim());
         request = client.prepare("POST", `/cases/${caseId}/documents`, decodeDocument, { multipart: form, status: 201 });
         update(index, { request });

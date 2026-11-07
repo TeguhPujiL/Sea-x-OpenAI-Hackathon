@@ -1,0 +1,30 @@
+{
+  "contract_version": "1.1",
+  "source_sha256": "fcc0388407f9cac2804b71be151f41a444a546bfa5d6648ac2ef33a4a40aecdc",
+  "source_pages": [29, 30, 31, 32, 33, 35, 38],
+  "request_schema": "ReviewCreate",
+  "request_properties": {
+    "repair_proposal_id": {"type": "string", "format": "uuid4"},
+    "decision": {"enum_ref": "ReviewDecision"},
+    "decision_reason": {"type": "string"},
+    "expected_case_version": {"type": "integer", "minimum": 1}
+  },
+  "response_properties": {
+    "ReviewView": ["review_id", "case_id", "repair_proposal_id", "decision", "decision_reason", "review_status", "reviewer", "assurance_status_after", "created_at"],
+    "ActorView": ["actor_id", "display_name", "role"],
+    "AuditActorView": ["actor_id", "display_name", "role"],
+    "ResourceView": ["type", "id", "version"],
+    "AuditView": ["event_id", "case_id", "event_type", "actor", "resource", "occurred_at", "request_id", "details", "previous_hash", "event_hash"]
+  },
+  "review_status": ["COMPLETED"],
+  "success_envelope": ["success", "data", "error", "meta"],
+  "error_fields": ["code", "message", "details", "retryable"],
+  "pagination": ["limit", "offset", "total"],
+  "owned_endpoints": [
+    ["POST", "/cases/{case_id}/reviews"],
+    ["GET", "/cases/{case_id}/reviews"],
+    ["GET", "/reviews/{review_id}"],
+    ["GET", "/cases/{case_id}/audit"],
+    ["GET", "/audit-events/{event_id}"]
+  ]
+}

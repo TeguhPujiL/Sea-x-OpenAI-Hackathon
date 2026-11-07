@@ -25,7 +25,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine.dispose()
 
     app = FastAPI(title="ProcureMind V4.1", version="1.1", lifespan=lifespan,
-        description="Shared foundation only. Feature router modules are empty. See contract gap register.")
+        description="Shared foundation with human review and audit APIs. Other business routers await owner integration. See contract gap register.")
     app.dependency_overrides[get_settings] = lambda: config
     app.include_router(router, prefix="/api/v1")
 

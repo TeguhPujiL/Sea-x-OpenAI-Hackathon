@@ -54,8 +54,14 @@ def test_health_openapi_and_safe_errors():
         assert "private-provider-secret" not in failure.text
 
 
-def test_only_health_is_registered():
-    assert set(create_app().openapi()["paths"]) == {"/api/v1/health"}
+def test_health_and_assurance_routes_are_registered_without_uncontracted_paths():
+    paths = set(create_app().openapi()["paths"])
+    assert {
+        "/api/v1/health", "/api/v1/cases/{case_id}/reviews", "/api/v1/reviews/{review_id}",
+        "/api/v1/cases/{case_id}/audit", "/api/v1/audit-events/{event_id}",
+    } <= paths
+    snapshot = json.loads((Path(__file__).resolve().parents[2] / "docs/contract_snapshot.json").read_text())
+    assert paths <= {"/api/v1" + r["path"] for r in snapshot["endpoints"]} | {"/api/v1/health"}
 
 
 def test_enum_sets_match_checked_contract():

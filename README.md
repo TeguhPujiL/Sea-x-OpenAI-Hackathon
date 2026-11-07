@@ -1,6 +1,6 @@
 # ProcureMind V4.1 shared foundation
 
-React/Vite/TypeScript/Tailwind shell and Python 3.11+ FastAPI/Pydantic v2/SQLAlchemy/SQLite infrastructure, aligned with the supplied API Contract v1.1. Section 2.3 controls. Business routers are empty; no teammate-owned features or synthetic live responses are implemented.
+React/Vite/TypeScript/Tailwind shell and Python 3.11+ FastAPI/Pydantic v2/SQLAlchemy/SQLite infrastructure, aligned with the supplied API Contract v1.1. Section 2.3 controls. This assurance branch implements the five review/audit endpoints; other business routers await their owners. See [assurance integration](docs/ASSURANCE_INTEGRATION.md) for migration/access setup and [QA results](docs/ASSURANCE_QA_REPORT.md) for release blockers. No synthetic response is presented as live AI output.
 
 ## Backend setup and run
 
@@ -50,7 +50,7 @@ $env:Path = $nodeDirectory + ';' + $env:Path
 .\.venv\Scripts\python.exe -m app.core.init_db
 ```
 
-The application never creates tables on startup. init_db uses create_all only as an empty demo bootstrap; it does not migrate existing tables. Relative SQLite paths resolve from the process working directory, so run from the repository root. Future production/feature integration requires reviewed migrations.
+The application never creates tables on startup. For this branch, initialize a new database with `python -m app.services.assurance.migrate`. The historical init_db command uses create_all only as an empty foundation demo bootstrap; it cannot install assurance guards. Existing unversioned databases require a reviewed adoption migration. Relative SQLite paths resolve from the process working directory, so run from the repository root. Production integration requires Teguh's migration review.
 
 ## Shared contract and identity
 
@@ -58,7 +58,7 @@ The shared schema module defines the exact 12 Appendix A enums, closed Pydantic 
 
 Demo identity is disabled by default. Enable PROCUREMIND_DEMO_MODE only with a backend-configured UUID v4 actor and explicit scopes. Role alone grants no scopes. The frontend owner must visibly label demo identity when consuming it. Production requests requiring identity fail closed until real OIDC verification exists. Every feature must authorize case access and reject cross-case references.
 
-The shared model module declares 14 tables and foreign keys, status/version/money/page constraints and idempotency uniqueness. SQLite triggers and an ORM guard reject mutation of persisted AI executions, simulations, reviews and audit events. Database owners still implement migrations, complete workflow constraints, JSON validation and atomic business/audit/idempotency writes. No simulator, AI execution, PDF extraction, human review or audit command is provided.
+The shared model module declares 14 tables and foreign keys, status/version/money/page constraints and idempotency uniqueness. SQLite triggers and an ORM guard reject mutation of persisted AI executions, simulations, reviews and audit events. Assurance adds explicit versioned migrations and atomic review/case/audit/idempotency writes. Other owners must integrate their commands with the audit transaction primitive. No live simulator, AI execution or PDF extraction command is provided on this branch.
 
 PyMuPDF and OpenAI SDK dependencies and backend-only provider/model configuration are prepared for Teguh's feature implementation. Schema-constrained AI calls and their output validation are not pre-implemented. Secrets and raw documents are never logged by the scaffold.
 
@@ -69,5 +69,6 @@ PyMuPDF and OpenAI SDK dependencies and backend-only provider/model configuratio
 - [Ownership](docs/OWNERSHIP.md): Frontend Lead owns frontend/src; Teguh owns core/shared and AI/document/business integration; Aris owns simulation; Fazhima owns review/audit/assurance QA. Shared models/schemas require Teguh review.
 - [Gaps](docs/CONTRACT_GAPS.md): no APPROVE_CASE or fake repair for clean cases; separate contract 660M/690M/825M fixture from negative-pack 710M/835M/680M. All corrections stay PROPOSED. Challenge readiness and signed-delta conflicts remain explicit.
 - [Verification results](docs/VERIFICATION.md) and [exact file inventory](docs/FOUNDATION_FILES.md).
+- [Assurance implementation and QA report](docs/ASSURANCE_QA_REPORT.md), [operational policy and Teguh handoff](docs/ASSURANCE_INTEGRATION.md), and [current assurance OpenAPI](docs/openapi.assurance.json). The foundation documents above describe the earlier baseline.
 
 The foundation is ready for owner handoff; it is not the completed P0 workflow or a full API contract regression pass.

@@ -14,6 +14,8 @@ import { vendorAssessment } from "./vendorAssessmentData";
 import { comparisonData } from "./VendorDecisionSummary";
 import { validateEvidenceSet } from "./repairEvidenceData";
 import { loadFindingScenarios, prepareFindingScenarioBatch } from "./findingScenarios";
+import { loadVendorEvidenceSummary } from "./vendorEvidenceSummary";
+import { decodeConclusion, loadConclusion } from "./procurementConclusion";
 
 export default function App({ config, userName, onLogout }: { config: ClientConfig; userName?: string; onLogout?: () => Promise<void> }) {
   const [typeDrafts, setTypeDrafts] = useState<Record<string, DocumentType>>({});
@@ -70,6 +72,12 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     if (next.findingScenarioHistory === undefined && next.caseResource?.case_id === current.caseResource?.case_id && next.job?.job_id === current.job?.job_id) {
       next = { ...next, findingScenarioHistory: current.findingScenarioHistory };
     }
+    if (next.caseResource?.case_id === current.caseResource?.case_id && next.job?.job_id === current.job?.job_id) {
+      next = { ...next, vendorEvidenceSummary: next.vendorEvidenceSummary ?? current.vendorEvidenceSummary,
+        vendorEvidenceSummaryError: next.vendorEvidenceSummaryError === undefined ? current.vendorEvidenceSummaryError : next.vendorEvidenceSummaryError,
+        procurementConclusion: next.procurementConclusion === undefined ? current.procurementConclusion : next.procurementConclusion,
+        procurementConclusionError: next.procurementConclusionError === undefined ? current.procurementConclusionError : next.procurementConclusionError };
+    }
     resourceRef.current = next; setResources(next);
   }, []);
   const refreshFindingScenarios = useCallback(async (signal?: AbortSignal) => {
@@ -87,11 +95,37 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
       else { setScenarioAvailability("error"); setScenarioLoadError(error instanceof Error ? error.message : "Could not load finding scenarios"); }
     }
   }, [client, commit]);
+  const refreshVendorEvidence = useCallback(async (signal?: AbortSignal) => {
+    const current = resourceRef.current, caseId = current.caseResource?.case_id, jobId = current.job?.job_id;
+    if (!caseId || !jobId || !current.job?.result) return;
+    try {
+      const summary = await loadVendorEvidenceSummary(client, caseId, jobId, signal);
+      if (!mounted.current || signal?.aborted || resourceRef.current.caseResource?.case_id !== caseId || resourceRef.current.job?.job_id !== jobId) return;
+      commit({ ...resourceRef.current, vendorEvidenceSummary: summary, vendorEvidenceSummaryError: null });
+    } catch (error) {
+      if (!mounted.current || signal?.aborted || resourceRef.current.caseResource?.case_id !== caseId || resourceRef.current.job?.job_id !== jobId) return;
+      commit({ ...resourceRef.current, vendorEvidenceSummaryError: error instanceof Error ? error.message : "Could not load vendor source details" });
+    }
+  }, [client, commit]);
+  const refreshConclusion = useCallback(async (signal?: AbortSignal) => {
+    const current = resourceRef.current, caseId = current.caseResource?.case_id, jobId = current.job?.job_id;
+    if (!caseId || !jobId || !current.job?.result) return;
+    try {
+      const conclusion = await loadConclusion(client, caseId, jobId, signal);
+      if (!mounted.current || signal?.aborted || resourceRef.current.caseResource?.case_id !== caseId || resourceRef.current.job?.job_id !== jobId) return;
+      commit({ ...resourceRef.current, procurementConclusion: conclusion, procurementConclusionError: null });
+    } catch (error) {
+      if (!mounted.current || signal?.aborted || resourceRef.current.caseResource?.case_id !== caseId || resourceRef.current.job?.job_id !== jobId) return;
+      commit({ ...resourceRef.current, procurementConclusionError: error instanceof Error ? error.message : "Could not load saved procurement decision" });
+    }
+  }, [client, commit]);
   useEffect(() => {
     const controller = new AbortController();
     void refreshFindingScenarios(controller.signal);
+    void refreshVendorEvidence(controller.signal);
+    void refreshConclusion(controller.signal);
     return () => controller.abort();
-  }, [resources.caseResource?.case_id, resources.job?.job_id, resources.job?.status, refreshFindingScenarios]);
+  }, [resources.caseResource?.case_id, resources.job?.job_id, resources.job?.status, refreshFindingScenarios, refreshVendorEvidence, refreshConclusion]);
   useEffect(() => {
     const caseId = resources.caseResource?.case_id;
     setTypeDrafts({});
@@ -187,7 +221,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
   async function refreshWorkspace() {
     if (busyRef.current || restoring) return;
     busyRef.current = true; setBusy("Refreshing resources"); setError(null); setTransportRetry(undefined);
-    try { const next = await refresh(true); await refreshFindingScenarios(); if (step === 5) await readAssurance(); if (conflict) setConflict({ ...conflict, refreshed: true, refreshError: undefined }); if (next.job && !terminal(next.job.status) && polling.current?.signal.aborted) beginPolling(next.job.job_id); }
+    try { const next = await refresh(true); await refreshFindingScenarios(); await refreshVendorEvidence(); await refreshConclusion(); if (step === 5) await readAssurance(); if (conflict) setConflict({ ...conflict, refreshed: true, refreshError: undefined }); if (next.job && !terminal(next.job.status) && polling.current?.signal.aborted) beginPolling(next.job.job_id); }
     catch (err) { setError(err instanceof Error ? err : new Error(String(err))); }
     finally { busyRef.current = false; setBusy(null); }
   }
@@ -396,7 +430,7 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     documentTypeDrafts={typeDrafts} onDocumentType={(documentId, type) => setTypeDrafts(previous => ({ ...previous, [documentId]: type }))}
     onSaveDocumentTypes={() => void saveTypes()} resources={resources} ids={ids} step={step} busy={busy} restoring={restoring} pollState={pollState} error={error} conflict={conflict} storageWarning={storageWarning} demoMode={demoMode} healthMessage={healthMessage} meta={client.lastMeta} transportRetry={transportRetry}
     proposedText={proposedText} dirtyDraft={dirtyDraft} setProposedText={value => adoptText(value, value !== resources.repair?.proposed_text)}
-    onStep={next => { setStep(next); if (next === 5) void readAssurance(); }} onRefresh={() => void refreshWorkspace()} onDismissError={() => setError(null)}
+    onStep={next => { setStep(next); if (next === 5) { void readAssurance(); void refreshVendorEvidence(); void refreshConclusion(); } }} onRefresh={() => void refreshWorkspace()} onDismissError={() => setError(null)}
     onReset={() => {
       if ((resources.caseResource || transportRetry || dirtyDraft || uploadItems.some(item => item.status === "unknown")) && !window.confirm(`Start a new local workspace? Existing cases remain on the server. Unsaved draft text will be discarded.${transportRetry || uploadItems.some(item => item.status === "unknown") ? " A request has an unknown server outcome; opening a new workspace abandons its transport retry." : ""}`)) return;
       polling.current?.abort(); restoration.current?.abort(); updateUploads([]); changeIds(emptyIds()); commit(emptyResources()); adoptText(""); setConflict(null); setError(null); setTransportRetry(undefined); setStep(0); setPollState(null);
@@ -418,9 +452,28 @@ export default function App({ config, userName, onLogout }: { config: ClientConf
     scenarioAvailability={scenarioAvailability} scenarioLoadError={scenarioLoadError} onGenerateFindingScenarios={generateFindingScenarios}
     selectedVendorId={vendorPreference.scope === preferenceScope ? vendorPreference.id : null}
     onSelectVendor={id => {
+      if (resourceRef.current.procurementConclusion) return;
       if (!preferenceScope || !comparisonData(resourceRef.current, null).vendors.some(v => v.id === id && v.selectable)) return;
       setVendorPreference({ scope: preferenceScope, id });
       try { window.sessionStorage.setItem(`procuremind.vendor-preference.${preferenceScope}`, id); } catch { setStorageWarning(true); }
+    }}
+    onConclude={(decision, reason, confirmed) => {
+      const snapshot = resourceRef.current, caseId = snapshot.caseResource?.case_id, jobId = snapshot.job?.job_id;
+      const selectedId = decision === "GO" && vendorPreference.scope === preferenceScope ? vendorPreference.id : null;
+      void execute("Recording final procurement decision", () => {
+        if (!caseId || !jobId || snapshot.procurementConclusion !== null || snapshot.procurementConclusionError) throw new Error("Refresh the current assessment and saved decision before concluding.");
+        return client.prepare("POST", `/experimental/cases/${caseId}/procurement-conclusions`, decodeConclusion, { status: 201,
+          body: { analysis_job_id: jobId, decision, selected_vendor_id: selectedId, decision_reason: reason,
+            expected_case_version: snapshot.caseResource!.version, vendor_review_confirmed: decision === "GO" && confirmed } });
+      }, async value => {
+        if (!value.conclusion || value.conclusion.case_id !== caseId || value.conclusion.analysis_job_id !== jobId) throw new ShapeError("Saved conclusion does not match this assessment.");
+        commit({ ...resourceRef.current, procurementConclusion: value.conclusion, procurementConclusionError: null });
+        if (decision === "NO_GO") {
+          setVendorPreference({ scope: preferenceScope, id: null });
+          try { window.sessionStorage.removeItem(`procuremind.vendor-preference.${preferenceScope}`); } catch { setStorageWarning(true); }
+        }
+        await readAssurance();
+      }, snapshot.caseResource?.version);
     }}
     onAnalyze={() => {
       if (hasTypeChanges) { setError(new Error("Save document types before analysis.")); return; }

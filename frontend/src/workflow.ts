@@ -1,5 +1,7 @@
 import { uuid, type CaseResource, type DocumentResource, type JobResource, type FindingResource, type ChallengeResource, type SimulationResource, type RepairResource, type ReviewResource, type AuditResource } from "./contracts";
 import type { FindingScenario } from "./findingScenarios";
+import type { VendorEvidenceSummary } from "./vendorEvidenceSummary";
+import type { ProcurementConclusion } from "./procurementConclusion";
 export const steps = ["Upload", "Assess", "Challenge", "Simulate", "Repair", "Assure"] as const;
 export interface Identifiers {
   case_id: string | null; document_ids: string[]; analysis_job_id: string | null; selected_finding_id: string | null;
@@ -12,6 +14,8 @@ export interface Resources {
   repair: RepairResource | null; reviews: ReviewResource[]; audit: AuditResource[];
   challengeHistory?: ChallengeResource[]; simulationHistory?: SimulationResource[];
   findingScenarioHistory?: FindingScenario[];
+  vendorEvidenceSummary?: VendorEvidenceSummary; vendorEvidenceSummaryError?: string | null;
+  procurementConclusion?: ProcurementConclusion | null; procurementConclusionError?: string | null;
 }
 export const emptyResources = (): Resources => ({ caseResource: null, documents: [], job: null, findings: [], challenge: null, simulation: null, repair: null, reviews: [], audit: [] });
 export const storageKey = "procuremind.workspace.ids.v1";

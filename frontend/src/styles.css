@@ -353,3 +353,14 @@ progress::-moz-progress-bar { background: #237c70; }
 .finding-scenario-result p, .finding-scenario-result li { font-size: 12px; overflow-wrap: anywhere; }
 .scenario-alternative, .scenario-check { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; }
 .finding-scenario-panel .field textarea { width: 100%; min-width: 0; }
+.vendor-offer-summary { margin: 18px 0; }
+.vendor-offer-summary h5 { margin: 18px 0 10px; font-size: 14px; }
+.vendor-offer-facts { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr); gap: 10px 18px; font-size: 12px; }
+.vendor-offer-facts dt { font-weight: 600; padding-top: 4px; }
+.vendor-offer-facts dd { margin: 0; overflow-wrap: anywhere; }
+.vendor-offer-facts dd p { margin: 3px 0 8px; }
+.vendor-repair-outcome { border-left: 3px solid #c7d5d0; padding: 6px 14px; margin: 14px 0; }
+.vendor-repair-outcome h6 { font-size: 13px; margin: 8px 0; }
+@media (max-width: 540px) { .vendor-offer-facts { grid-template-columns: minmax(0, 1fr); gap: 5px; } .vendor-offer-facts dd { margin-bottom: 12px; } }
+.final-procurement-decision { margin: 1.5rem 0; padding-top: 1rem; border-top: 1px solid var(--line, #cfdcdb); }
+.final-procurement-decision fieldset { display: grid; gap: 1rem; min-width: 0; }

@@ -41,6 +41,7 @@ def append_audit(session: Session, *, actor: Actor, case_id: UUID, request_id: s
 # details until their owner registers a reviewed projection; raw text is never
 # returned simply because a field happens to have an innocuous key name.
 SAFE_DETAILS = {
+    "PROCUREMENT_CONCLUSION_RECORDED": {"decision", "selected_vendor_id", "analysis_job_id", "source_case_version"},
     "REVIEW_COMPLETED": {"decision", "assurance_status_after", "repair_proposal_id",
                          "case_version_before", "case_version_after"},
     "CASE_ASSURANCE_CHANGED": {"assurance_status_before", "assurance_status_after",

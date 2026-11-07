@@ -127,6 +127,17 @@ export function createVendorComparisonPdf(comparison: Comparison, fontBase64: st
 
   heading("Current vendor preference");
   field("Preferred vendor", comparison.selected_vendor_label ?? "No current vendor selected");
+  if (comparison.procurement_conclusion) {
+    const conclusion = comparison.procurement_conclusion;
+    heading("Final internal procurement decision", 2);
+    field("Decision", conclusion.decision === "GO" ? "GO" : "NO-GO");
+    field("Selected vendor", conclusion.selected_vendor_label ?? "None");
+    field("Reason", conclusion.decision_reason);
+    field("Reviewer", conclusion.reviewer.display_name);
+    field("Recorded at (UTC)", conclusion.created_at);
+    field("Conclusion ID", conclusion.conclusion_id);
+    paragraph("This saved internal conclusion does not issue statutory approval or change the v1.1 case approval status.");
+  }
   field("Preference status", comparison.preference_status);
   paragraph(comparison.preference_status === "PROVISIONAL_PREFERENCE_UNRESOLVED_POINTS"
     ? "This preference is provisional. Unresolved findings or processing warnings still require review."
@@ -160,6 +171,33 @@ export function createVendorComparisonPdf(comparison: Comparison, fontBase64: st
     paragraph(`${vendor.risk.color.toUpperCase()} - ${vendor.risk.score === null ? "Unscored" : `${vendor.risk.score} active finding(s)`} - ${vendor.risk.label}`, { color: riskColor(vendor.risk.color) });
     vendor.risk.reasons.forEach(bullet);
     field("Recorded open point IDs", vendor.open_point_ids.length ? vendor.open_point_ids.join(", ") : "None recorded");
+    const offer = vendor.offer_and_repair_summary;
+    heading("Offer facts and original-finding repair result", 2);
+    if (!offer.available) paragraph("Source-labelled vendor facts and original repair history are not loaded. Values are not inferred.", { color: MUTED });
+    for (const pack of offer.packages) {
+      field("Evidence package", pack.source);
+      if (!pack.facts.length) paragraph("No explicit labelled offer facts were extracted from the selected documents.", { size: 9, color: MUTED });
+      for (const fact of pack.facts) {
+        field(fact.label, fact.value);
+        paragraph(`Source: ${documents.get(fact.source.document_id)?.filename ?? fact.source.document_id}, page ${fact.source.page_number}`, { size: 8, color: MUTED });
+        paragraph(fact.source.excerpt, { size: 8, indent: 2, after: 3 });
+      }
+      field("Newly included vendor documents", pack.newly_included_document_ids.length);
+    }
+    field("Current reassessment result", offer.current_assessment);
+    field("Original finding analysis", offer.initial_analysis_job_id ?? "Not loaded");
+    if (offer.available && !offer.original_findings.length) paragraph("No original finding is linked to this vendor in the loaded baseline.", { size: 9, color: MUTED });
+    for (const original of offer.original_findings) {
+      paragraph(original.title, { size: 10, color: TEAL });
+      field("Original finding status", original.status);
+      field("Repair outcome", original.outcome);
+      for (const repair of original.repairs) {
+        field("Repair proposal", `${repair.status} - ${repair.repair_proposal_id}`);
+        field("Original text", repair.before_text); field("Proposed repair", repair.proposed_text); field("Justification", repair.justification);
+      }
+      for (const review of original.reviews) field(`Review ${review.decision}`, review.decision_reason);
+    }
+    paragraph("A clean reassessment, a repair proposal and a formally resolved finding are distinct records.", { size: 9, color: MUTED });
     for (const pack of vendor.packages) {
       heading(`${pack.source === "uploaded" ? "Uploaded documents" : `${pack.source} package`}`, 2);
       field("Recorded package status", pack.status);

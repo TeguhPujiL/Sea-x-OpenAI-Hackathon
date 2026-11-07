@@ -31,7 +31,7 @@ export function createClient(config: ClientConfig, fetcher: Fetch = fetch, newId
   function prepare<T>(method: string, path: string, decoder: Decoder<T>, options: { body?: unknown; status?: number; multipart?: FormData } = {}): PreparedRequest<T> {
     if (!path.startsWith("/") || path.startsWith("//")) throw new ShapeError("Invalid resource path.");
     const headers: Record<string, string> = { Accept: "application/json" };
-    const key = requiresIdempotency(method, path) ? newId() : undefined;
+    const key = requiresIdempotency(method, path) || method === "POST" && /^\/experimental\/cases\/[^/]+\/procurement-conclusions$/.test(path) ? newId() : undefined;
     if (key) headers["Idempotency-Key"] = key;
     let body: BodyInit | undefined;
     if (options.multipart) {

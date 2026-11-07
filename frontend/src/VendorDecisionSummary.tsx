@@ -3,8 +3,14 @@ import type { Resources } from "./workflow";
 import { activeConcern, vendorAssessment } from "./vendorAssessmentData";
 import { DocumentationRisk } from "./DocumentationRisk";
 import { VendorGroup, VendorGroups } from "./VendorGroup";
+import { VendorOfferSummary } from "./VendorOfferSummary";
+import { vendorEvidence } from "./vendorEvidenceSummary";
+import { FinalProcurementDecision } from "./FinalProcurementDecision";
+import type { ProcurementDecision } from "./procurementConclusion";
 
 export function comparisonData(resources: Resources, selectedVendorId: string | null) {
+  const conclusion = resources.procurementConclusion;
+  if (conclusion) selectedVendorId = conclusion.decision === "GO" ? conclusion.selected_vendor_id : null;
   const assessment = vendorAssessment(resources);
   const { caseResource, job, documents, findings } = assessment.summary;
   const inputIds = new Set(job?.ai_execution?.input_document_ids ?? []);
@@ -25,6 +31,7 @@ export function comparisonData(resources: Resources, selectedVendorId: string | 
       .filter(doc => doc.document_type === "SUPPLIER_QUOTATION" && doc.processing_status === "COMPLETED" && inputIds.has(doc.document_id));
     const points = unique(vendor.packages.flatMap(pack => pack.challengePoints), item => item.finding_id);
     return { id: vendor.id, label: vendor.label, risk: vendor.risk, selectable: usableAnalysis && analyzedQuotations.length > 0,
+      offer_and_repair_summary: vendorEvidence(resources, vendor.id),
       analyzed_quotation_ids: analyzedQuotations.map(doc => doc.document_id),
       open_point_ids: points.map(point => point.finding_id),
       packages: vendor.packages.map(pack => ({ source: pack.source, status: pack.status, risk: pack.risk,
@@ -41,7 +48,7 @@ export function comparisonData(resources: Resources, selectedVendorId: string | 
     selected_vendor_id: selectedVendor?.id ?? null, selected_vendor_label: selectedVendor?.label ?? null,
     stale_selection: !!selectedVendorId && !selectedVendor,
     preference_status: !selectedVendor ? "NO_CURRENT_PREFERENCE" : unresolved ? "PROVISIONAL_PREFERENCE_UNRESOLVED_POINTS" : "PREFERENCE_FOR_HUMAN_REVIEW",
-    usable_analysis: usableAnalysis, vendors,
+    usable_analysis: usableAnalysis, vendors, procurement_conclusion: conclusion ?? null,
     progress: { uploaded_documents: documents.length, analyzed_documents: documents.filter(doc => inputIds.has(doc.document_id)).length,
       extracted_requirements: assessment.summary.requirementCount, current_findings: findings.length, unresolved_findings: openFindings.length,
       recorded_challenges: challenges.length, recorded_simulations: simulations.length,
@@ -60,38 +67,31 @@ export function comparisonData(resources: Resources, selectedVendorId: string | 
       "Only loaded current-analysis challenge/simulation records are counted; unsupported simulation methods are not inferred complete."] };
 }
 
-export function VendorDecisionSummary({ resources, selectedVendorId, onSelectVendor, disabled }: {
+export function VendorDecisionSummary({ resources, selectedVendorId, onSelectVendor, disabled, onConclude }: {
   resources: Resources; selectedVendorId: string | null; onSelectVendor: (id: string) => void; disabled: boolean;
+  onConclude?: (decision: ProcurementDecision, reason: string, confirmed: boolean) => void;
 }) {
   const comparison = comparisonData(resources, selectedVendorId);
-  return <section className="vendor-decision-summary" aria-labelledby="vendor-decision-title">
-    <div className="section-title"><h3 id="vendor-decision-title">Vendor score summary and preference</h3></div>
-    <p>Compare the current documentation risk for each vendor, then record your preference for human review. No vendor is selected automatically.</p>
-    <p className="muted">Green = no applicable active findings with completed documentation coverage; yellow = 1-2 active findings; red = 3 or more active findings. The score shows the actual finding count. Incomplete coverage with no findings remains unscored. Scores do not establish full compliance.</p>
-    <dl className="metadata"><dt>Uploaded / analyzed documents</dt><dd>{comparison.progress.uploaded_documents} / {comparison.progress.analyzed_documents}</dd>
-      <dt>Current analysis</dt><dd>{comparison.analysis_status ?? "Not run"}</dd><dt>Extracted requirements</dt><dd>{comparison.progress.extracted_requirements ?? "Not reported"}</dd>
-      <dt>Unresolved current findings</dt><dd>{comparison.progress.unresolved_findings}</dd><dt>Recorded current challenges</dt><dd>{comparison.progress.recorded_challenges}</dd>
-      <dt>Recorded current simulations</dt><dd>{comparison.progress.recorded_simulations}</dd><dt>Current repair</dt><dd>{comparison.progress.repair_status ?? "Not loaded"}</dd>
-      <dt>Finding-based scenario drafts</dt><dd>{comparison.progress.recorded_finding_scenarios}</dd>
-      <dt>Loaded case reviews</dt><dd>{comparison.progress.loaded_reviews}</dd></dl>
-    <p className="muted">These are saved record counts, not a declaration that every workflow step or simulation method is complete.</p>
+  return <section className="vendor-decision-summary" aria-label="Vendor summaries and final decision">
     {comparison.stale_selection && <p className="notice warning-notice" role="status">The previous preference is unavailable in this analysis. Select an analyzed vendor again.</p>}
-    <fieldset disabled={disabled}><legend>Preferred vendor for human review</legend>
+    <fieldset disabled={disabled}><legend>Choose a vendor</legend>
       <VendorGroups label="Assure vendor groups">{comparison.vendors.length ? comparison.vendors.map(vendor => <VendorGroup key={vendor.id} title={vendor.label} summary={<DocumentationRisk risk={vendor.risk} />}>
         <p>{vendor.analyzed_quotation_ids.length} analyzed quotation(s) · {vendor.open_point_ids.length} open related/shared point(s)</p>
+        <VendorOfferSummary resources={resources} vendorId={vendor.id} />
         <ul className="risk-reasons">{vendor.risk.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
         <details><summary>Document packages and scores</summary>{vendor.packages.map(pack => <section className="vendor-package" key={pack.source}>
           <h5>{pack.source === "uploaded" ? "Uploaded documents" : `${pack.source} package`}</h5><DocumentationRisk risk={pack.risk} />
           <p>{pack.status}</p><ul>{pack.documents.map(doc => <li key={doc.document_id}>{doc.filename} · {doc.included_in_analysis ? "included in current analysis" : "outside current analysis"}</li>)}</ul>
         </section>)}</details>
         <label className="checkbox"><input type="radio" name="preferred_vendor" value={vendor.id} checked={comparison.selected_vendor_id === vendor.id}
-          disabled={!vendor.selectable} onChange={() => onSelectVendor(vendor.id)} />Select {vendor.label}</label>
+          disabled={!vendor.selectable || !!resources.procurementConclusion} onChange={() => onSelectVendor(vendor.id)} />Select {vendor.label}</label>
         {!vendor.selectable && <p className="muted">A usable current analysis including this vendor's readable quotation is required before selection.</p>}
       </VendorGroup>) : <p>No vendor-labelled supplier quotation is available for comparison.</p>}</VendorGroups>
     </fieldset>
-    {comparison.selected_vendor_label ? <div className="notice info-notice" role="status"><strong>Preferred vendor: {comparison.selected_vendor_label}</strong>
+    {!resources.procurementConclusion && (comparison.selected_vendor_label ? <div className="notice info-notice" role="status"><strong>Preferred vendor: {comparison.selected_vendor_label}</strong>
       <p>{comparison.preference_status === "PROVISIONAL_PREFERENCE_UNRESOLVED_POINTS" ? "This preference is provisional. Unresolved findings or processing warnings still require review." : "This preference is available for the authorized human review."}</p>
-      <p>Selection does not approve a procurement, close findings, or change server assurance status.</p></div> : <p role="status">No current vendor preference selected.</p>}
+      <p>Selection does not approve a procurement, close findings, or change server assurance status.</p></div> : <p role="status">No current vendor preference selected.</p>)}
+    <FinalProcurementDecision key={`${comparison.case_id}.${comparison.analysis_job_id}`} resources={resources} disabled={disabled} selectedVendorId={comparison.selected_vendor_id} selectedVendorLabel={comparison.selected_vendor_label} onConclude={onConclude} />
     <VendorComparisonDownload comparison={comparison} disabled={disabled} />
   </section>;
 }
